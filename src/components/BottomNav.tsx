@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV = [
   { href: "/", label: "受信箱", icon: InboxIcon },
   { href: "/today", label: "今日", icon: SunIcon },
-  { href: "/calendar", label: "カレンダー", icon: CalendarIcon },
+  { href: "/calendar", label: "カレンダ", icon: CalendarIcon },
   { href: "/tasks", label: "タスク", icon: CheckIcon },
   { href: "/notes", label: "メモ", icon: NoteIcon },
 ];

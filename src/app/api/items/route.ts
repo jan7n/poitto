@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import { type ItemType } from "@/generated/prisma/client";
-import { jstNowLabel } from "@/lib/jst";
+import { jstNowLabel, parseAsJST } from "@/lib/jst";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -94,11 +94,9 @@ export async function POST(request: Request) {
         type: classified.type ?? "NOTE",
         title: classified.title ?? rawInput.slice(0, 30),
         content: classified.content ?? null,
-        startAt: classified.startAt ? new Date(classified.startAt) : null,
-        endAt: classified.endAt ? new Date(classified.endAt) : null,
-        deadlineAt: classified.deadlineAt
-          ? new Date(classified.deadlineAt)
-          : null,
+        startAt: parseAsJST(classified.startAt),
+        endAt: parseAsJST(classified.endAt),
+        deadlineAt: parseAsJST(classified.deadlineAt),
       },
     });
 

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
-import { jstNow, jstNowLabel, toJSTKey, fmtTime, fmtDateTime } from "@/lib/jst";
+import { jstNow, jstNowLabel, toJSTKey, fmtTime, fmtDateTime, parseAsJST } from "@/lib/jst";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ItemType } from "@/lib/types";
 
@@ -246,9 +246,9 @@ export async function POST(request: Request) {
           type: d.type ?? "NOTE",
           title: d.title ?? message.slice(0, 30),
           content: d.content ?? null,
-          startAt: d.startAt ? new Date(d.startAt) : null,
-          endAt: d.endAt ? new Date(d.endAt) : null,
-          deadlineAt: d.deadlineAt ? new Date(d.deadlineAt) : null,
+          startAt: parseAsJST(d.startAt),
+          endAt: parseAsJST(d.endAt),
+          deadlineAt: parseAsJST(d.deadlineAt),
         },
       });
       return Response.json({ action: "register", reply: result.reply, item });
@@ -265,9 +265,9 @@ export async function POST(request: Request) {
       if (u.type !== undefined) patch.type = u.type;
       if (u.title !== undefined) patch.title = u.title;
       if ("content" in u) patch.content = u.content ?? null;
-      if ("startAt" in u) patch.startAt = u.startAt ? new Date(u.startAt) : null;
-      if ("endAt" in u) patch.endAt = u.endAt ? new Date(u.endAt) : null;
-      if ("deadlineAt" in u) patch.deadlineAt = u.deadlineAt ? new Date(u.deadlineAt) : null;
+      if ("startAt" in u) patch.startAt = parseAsJST(u.startAt);
+      if ("endAt" in u) patch.endAt = parseAsJST(u.endAt);
+      if ("deadlineAt" in u) patch.deadlineAt = parseAsJST(u.deadlineAt);
 
       try {
         const item = await prisma.item.update({ where: { id: targetId }, data: patch });

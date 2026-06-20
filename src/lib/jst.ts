@@ -38,6 +38,15 @@ export function jstNowLabel(): string {
   return `${jst.getUTCFullYear()}年${jst.getUTCMonth() + 1}月${jst.getUTCDate()}日（${wd}曜日）${h}:${min}`;
 }
 
+// Parse a date string from Claude as JST.
+// If the string has no timezone info, treat it as JST (+09:00) instead of UTC.
+export function parseAsJST(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const hasOffset = /Z$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
+  const d = new Date(hasOffset ? s : s + "+09:00");
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // Display helpers (client-side — uses Intl)
 export function fmtDate(date: Date | string | null): string {
   if (!date) return "";
