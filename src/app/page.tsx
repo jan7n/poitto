@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { TYPE_COLOR, TYPE_LABEL, type Item } from "@/lib/types";
 import { fmtDate, fmtDateTime, fmtTime } from "@/lib/jst";
+import { useItems } from "@/components/ItemsProvider";
 
 interface ConvMsg {
   id: string;
@@ -21,6 +22,7 @@ const WELCOME: ConvMsg = {
 const STORAGE_KEY = "poitto-chat-v1";
 
 export default function Home() {
+  const { refresh: refreshItems } = useItems();
   const [messages, setMessages] = useState<ConvMsg[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -131,11 +133,10 @@ export default function Home() {
                   )
                 );
                 setLastItemId(event.item.id);
-              } else if (
-                event.action === "delete" &&
-                event.deletedId === lastItemId
-              ) {
-                setLastItemId(null);
+                refreshItems();
+              } else if (event.action === "delete") {
+                if (event.deletedId === lastItemId) setLastItemId(null);
+                refreshItems();
               }
             } else if (event.t === "error" && event.message) {
               setMessages((prev) =>

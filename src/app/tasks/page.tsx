@@ -1,24 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import ItemCard from "@/components/ItemCard";
-import type { Item } from "@/lib/types";
+import { useItems } from "@/components/ItemsProvider";
 
 export default function TasksPage() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [fetching, setFetching] = useState(true);
+  const { items, fetching, patchItem } = useItems();
   const [showCompleted, setShowCompleted] = useState(false);
-
-  const fetchItems = useCallback(async () => {
-    const res = await fetch("/api/items");
-    const data = await res.json();
-    if (Array.isArray(data)) setItems(data);
-    setFetching(false);
-  }, []);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
 
   async function handleToggle(id: string, completed: boolean) {
     const res = await fetch(`/api/items/${id}`, {
@@ -28,7 +16,7 @@ export default function TasksPage() {
     });
     if (res.ok) {
       const updated = await res.json();
-      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      patchItem(updated);
     }
   }
 
@@ -125,7 +113,7 @@ function SectionHeader({
   muted?: boolean;
   inline?: boolean;
 }) {
-  const content = (
+  return (
     <div className={`flex items-center gap-2 ${inline ? "" : "mb-3"}`}>
       <h2 className={`text-sm font-semibold ${muted ? "text-zinc-400" : colorClass}`}>
         {title}
@@ -135,5 +123,4 @@ function SectionHeader({
       </span>
     </div>
   );
-  return content;
 }

@@ -1,40 +1,31 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import ItemCard from "@/components/ItemCard";
-import type { Item } from "@/lib/types";
+import { useItems } from "@/components/ItemsProvider";
 import { jstNow, toJSTKey, fmtDate } from "@/lib/jst";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
 export default function CalendarPage() {
-  const today = jstNow();
-  const [year, setYear] = useState(today.getUTCFullYear());
-  const [month, setMonth] = useState(today.getUTCMonth() + 1); // 1-based
-  const [selectedKey, setSelectedKey] = useState<string | null>(toJSTKey(today));
-  const [items, setItems] = useState<Item[]>([]);
-  const [fetching, setFetching] = useState(true);
+  const { items, fetching } = useItems();
 
-  const fetchItems = useCallback(async () => {
-    const res = await fetch("/api/items");
-    const data = await res.json();
-    if (Array.isArray(data)) setItems(data);
-    setFetching(false);
-  }, []);
+  // jstNow() gives shifted Date — use getUTC* for JST year/month values
+  const todayJst = jstNow();
+  const [year, setYear] = useState(todayJst.getUTCFullYear());
+  const [month, setMonth] = useState(todayJst.getUTCMonth() + 1);
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  // Use new Date() (real UTC) — toJSTKey handles JST shift internally
+  const todayKey = toJSTKey(new Date());
+  const [selectedKey, setSelectedKey] = useState<string | null>(todayKey);
 
-  // Build event day set for current month
   const eventDays = new Set(
     items
       .filter((i) => i.type === "EVENT" && i.startAt)
       .map((i) => toJSTKey(i.startAt!))
   );
 
-  // Calendar grid
-  const firstDow = new Date(year, month - 1, 1).getDay(); // 0=Sun
+  const firstDow = new Date(year, month - 1, 1).getDay();
   const lastDate = new Date(year, month, 0).getDate();
   const cells: (number | null)[] = [
     ...Array(firstDow).fill(null),
@@ -45,8 +36,6 @@ export default function CalendarPage() {
   function keyForDay(d: number) {
     return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   }
-
-  const todayKey = toJSTKey(today);
 
   function prevMonth() {
     if (month === 1) { setYear((y) => y - 1); setMonth(12); }
@@ -70,7 +59,6 @@ export default function CalendarPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <div className="mx-auto max-w-2xl px-4 py-8 pb-24">
-        {/* Month header */}
         <div className="mb-4 flex items-center justify-between">
           <button
             onClick={prevMonth}
@@ -89,7 +77,6 @@ export default function CalendarPage() {
           </button>
         </div>
 
-        {/* Weekday headers */}
         <div className="mb-1 grid grid-cols-7 text-center">
           {WEEKDAYS.map((d, i) => (
             <div
@@ -103,7 +90,6 @@ export default function CalendarPage() {
           ))}
         </div>
 
-        {/* Calendar grid */}
         <div className="grid grid-cols-7 gap-y-1">
           {cells.map((day, idx) => {
             if (!day) return <div key={`empty-${idx}`} />;
@@ -123,22 +109,25 @@ export default function CalendarPage() {
                     : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 }`}
               >
-                <span className={`text-sm ${
-                  idx % 7 === 0 && !isSelected ? "text-red-400" : ""
-                } ${idx % 7 === 6 && !isSelected ? "text-blue-400" : ""}`}>
+                <span
+                  className={`text-sm ${idx % 7 === 0 && !isSelected ? "text-red-400" : ""} ${
+                    idx % 7 === 6 && !isSelected ? "text-blue-400" : ""
+                  }`}
+                >
                   {day}
                 </span>
                 {hasEvent && (
-                  <span className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
-                    isSelected ? "bg-white dark:bg-zinc-900" : "bg-blue-400"
-                  }`} />
+                  <span
+                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
+                      isSelected ? "bg-white dark:bg-zinc-900" : "bg-blue-400"
+                    }`}
+                  />
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Selected day events */}
         {selectedKey && (
           <div className="mt-6">
             <h2 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">

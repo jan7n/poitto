@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import ItemCard from "@/components/ItemCard";
-import type { Item, ItemType } from "@/lib/types";
+import { useItems } from "@/components/ItemsProvider";
+import type { ItemType } from "@/lib/types";
 
 const FILTERS: { label: string; types: ItemType[] }[] = [
   { label: "すべて", types: ["NOTE", "IDEA"] },
@@ -11,20 +12,8 @@ const FILTERS: { label: string; types: ItemType[] }[] = [
 ];
 
 export default function NotesPage() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [fetching, setFetching] = useState(true);
+  const { items, fetching } = useItems();
   const [filter, setFilter] = useState(0);
-
-  const fetchItems = useCallback(async () => {
-    const res = await fetch("/api/items");
-    const data = await res.json();
-    if (Array.isArray(data)) setItems(data);
-    setFetching(false);
-  }, []);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
 
   const { types } = FILTERS[filter];
   const filtered = items.filter((i) => types.includes(i.type));
@@ -34,7 +23,6 @@ export default function NotesPage() {
       <div className="mx-auto max-w-2xl px-4 py-8 pb-24">
         <h1 className="mb-4 text-2xl font-bold text-zinc-900 dark:text-zinc-50">メモ</h1>
 
-        {/* Filter tabs */}
         <div className="mb-6 flex gap-2">
           {FILTERS.map(({ label }, i) => (
             <button

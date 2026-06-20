@@ -1,26 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import ItemCard from "@/components/ItemCard";
-import type { Item } from "@/lib/types";
-import { toJSTKey, fmtDate, jstNow } from "@/lib/jst";
+import { useItems } from "@/components/ItemsProvider";
+import { toJSTKey, fmtDate } from "@/lib/jst";
 
 export default function TodayPage() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [fetching, setFetching] = useState(true);
+  const { items, fetching, patchItem } = useItems();
 
-  const todayKey = toJSTKey(jstNow());
-
-  const fetchItems = useCallback(async () => {
-    const res = await fetch("/api/items");
-    const data = await res.json();
-    if (Array.isArray(data)) setItems(data);
-    setFetching(false);
-  }, []);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  // Use new Date() (real UTC) — toJSTKey handles the JST shift internally
+  const todayKey = toJSTKey(new Date());
 
   async function handleToggle(id: string, completed: boolean) {
     const res = await fetch(`/api/items/${id}`, {
@@ -30,7 +18,7 @@ export default function TodayPage() {
     });
     if (res.ok) {
       const updated = await res.json();
-      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      patchItem(updated);
     }
   }
 
@@ -38,15 +26,14 @@ export default function TodayPage() {
     (i) => i.type === "EVENT" && i.startAt && toJSTKey(i.startAt) === todayKey
   );
   const pendingTasks = items.filter(
-    (i) =>
-      (i.type === "TASK" || i.type === "DEADLINE_TASK") && !i.completed
+    (i) => (i.type === "TASK" || i.type === "DEADLINE_TASK") && !i.completed
   );
   const completedTasks = items.filter(
-    (i) =>
-      (i.type === "TASK" || i.type === "DEADLINE_TASK") && i.completed
+    (i) => (i.type === "TASK" || i.type === "DEADLINE_TASK") && i.completed
   );
 
-  const todayLabel = fmtDate(jstNow());
+  // fmtDate uses Intl with timeZone:"Asia/Tokyo" — pass real Date, not jstNow()
+  const todayLabel = fmtDate(new Date());
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -76,12 +63,7 @@ export default function TodayPage() {
               ) : (
                 <ul className="space-y-3">
                   {pendingTasks.map((item) => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      showCheckbox
-                      onToggle={handleToggle}
-                    />
+                    <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />
                   ))}
                 </ul>
               )}
@@ -124,7 +106,11 @@ function Section({
   return (
     <div className={className}>
       <div className="mb-3 flex items-center gap-2">
-        <h2 className={`text-sm font-semibold ${muted ? "text-zinc-400" : "text-zinc-700 dark:text-zinc-300"}`}>
+        <h2
+          className={`text-sm font-semibold ${
+            muted ? "text-zinc-400" : "text-zinc-700 dark:text-zinc-300"
+          }`}
+        >
           {title}
         </h2>
         <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">

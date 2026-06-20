@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import AppHeader from "@/components/AppHeader";
+import { ItemsProvider } from "@/components/ItemsProvider";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
@@ -46,19 +47,20 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {user && <AppHeader email={user.email ?? ""} />}
-        {/* pb accounts for BottomNav (72px) + iPhone home indicator */}
-        <div
-          className={`flex-1 ${user ? "pt-10" : ""}`}
-          style={
-            user
-              ? { paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }
-              : undefined
-          }
-        >
-          {children}
-        </div>
-        {user && <BottomNav />}
+        {user ? (
+          <ItemsProvider>
+            <AppHeader email={user.email ?? ""} />
+            <div
+              className="flex-1 pt-10"
+              style={{ paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}
+            >
+              {children}
+            </div>
+            <BottomNav />
+          </ItemsProvider>
+        ) : (
+          <div className="flex-1">{children}</div>
+        )}
       </body>
     </html>
   );
