@@ -12,6 +12,12 @@ interface ConvMsg {
   item?: Item;
 }
 
+interface PendingItem {
+  type: string;
+  title: string;
+  content?: string;
+}
+
 const WELCOME: ConvMsg = {
   id: "welcome",
   role: "assistant",
@@ -27,6 +33,7 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastItemId, setLastItemId] = useState<string | null>(null);
+  const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -35,9 +42,14 @@ export default function Home() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
-      const saved = JSON.parse(raw) as { messages: ConvMsg[]; lastItemId: string | null };
+      const saved = JSON.parse(raw) as {
+        messages: ConvMsg[];
+        lastItemId: string | null;
+        pendingItem?: PendingItem | null;
+      };
       if (saved.messages?.length > 0) setMessages(saved.messages);
       if (saved.lastItemId) setLastItemId(saved.lastItemId);
+      if (saved.pendingItem) setPendingItem(saved.pendingItem);
     } catch {}
   }, []);
 
@@ -45,10 +57,10 @@ export default function Home() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ messages: messages.slice(-60), lastItemId })
+        JSON.stringify({ messages: messages.slice(-60), lastItemId, pendingItem })
       );
     } catch {}
-  }, [messages, lastItemId]);
+  }, [messages, lastItemId, pendingItem]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -87,7 +99,7 @@ export default function Home() {
       const res = await fetch("/api/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history, lastItemId }),
+        body: JSON.stringify({ message: text, history, lastItemId, pendingItem }),
       });
 
       if (!res.ok || !res.body) throw new Error("Network error");
@@ -102,7 +114,6 @@ export default function Home() {
 
         buf += decoder.decode(value, { stream: true });
 
-        // Parse complete SSE events (delimited by \n\n)
         const parts = buf.split("\n\n");
         buf = parts.pop() ?? "";
 
@@ -117,6 +128,7 @@ export default function Home() {
               item?: Item;
               deletedId?: string;
               message?: string;
+              pendingItem?: PendingItem;
             };
 
             if (event.t === "chunk" && event.v) {
@@ -126,19 +138,27 @@ export default function Home() {
                 )
               );
             } else if (event.t === "done") {
-              if (event.item) {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === loadingId ? { ...m, item: event.item } : m
-                  )
-                );
-                setLastItemId(event.item.id);
-                refreshItems();
-              } else if (event.action === "delete") {
-                if (event.deletedId === lastItemId) setLastItemId(null);
-                refreshItems();
+              if (event.action === "ask_deadline" && event.pendingItem) {
+                // AI asked for a deadline — store pending item
+                setPendingItem(event.pendingItem);
+              } else {
+                // Any other action clears the pending state
+                setPendingItem(null);
+                if (event.item) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === loadingId ? { ...m, item: event.item } : m
+                    )
+                  );
+                  setLastItemId(event.item.id);
+                  refreshItems();
+                } else if (event.action === "delete") {
+                  if (event.deletedId === lastItemId) setLastItemId(null);
+                  refreshItems();
+                }
               }
             } else if (event.t === "error" && event.message) {
+              setPendingItem(null);
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === loadingId ? { ...m, content: event.message! } : m
@@ -186,12 +206,33 @@ export default function Home() {
         className="fixed left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95"
         style={{ bottom: "calc(72px + env(safe-area-inset-bottom))" }}
       >
+        {/* Pending deadline hint */}
+        {pendingItem && (
+          <div className="mx-auto max-w-2xl px-4 pt-2">
+            <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+              <span>⏰</span>
+              <span>「{pendingItem.title}」の期限はいつですか？</span>
+              <button
+                onClick={() => setPendingItem(null)}
+                className="ml-auto text-amber-400 hover:text-amber-600 dark:hover:text-amber-200"
+                aria-label="キャンセル"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mx-auto flex max-w-2xl items-end gap-2 px-4 py-3">
           <textarea
             ref={textareaRef}
             value={input}
             rows={1}
-            placeholder="予定やタスクを入力、または質問…"
+            placeholder={
+              pendingItem
+                ? `「${pendingItem.title}」の期限を入力（例：明日、来週月曜）`
+                : "予定やタスクを入力、または質問…"
+            }
             className="flex-1 resize-none rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition-[height] focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:ring-zinc-800"
             style={{ minHeight: "44px", maxHeight: "160px" }}
             onChange={(e) => {
@@ -282,7 +323,7 @@ function MiniItemCard({ item }: { item: Item }) {
         </span>
       </div>
       {item.content && (
-        <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-1">
+        <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-500 dark:text-zinc-400">
           {item.content}
         </p>
       )}

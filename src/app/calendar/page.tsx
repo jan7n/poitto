@@ -19,10 +19,16 @@ export default function CalendarPage() {
   const todayKey = toJSTKey(new Date());
   const [selectedKey, setSelectedKey] = useState<string | null>(todayKey);
 
+  // Track days that have EVENTs (blue) and/or DEADLINE_TASKs (orange)
   const eventDays = new Set(
     items
       .filter((i) => i.type === "EVENT" && i.startAt)
       .map((i) => toJSTKey(i.startAt!))
+  );
+  const deadlineDays = new Set(
+    items
+      .filter((i) => i.type === "DEADLINE_TASK" && i.deadlineAt)
+      .map((i) => toJSTKey(i.deadlineAt!))
   );
 
   const firstDow = new Date(year, month - 1, 1).getDay();
@@ -48,7 +54,9 @@ export default function CalendarPage() {
 
   const selectedItems = selectedKey
     ? items.filter(
-        (i) => i.type === "EVENT" && i.startAt && toJSTKey(i.startAt) === selectedKey
+        (i) =>
+          (i.type === "EVENT" && i.startAt && toJSTKey(i.startAt) === selectedKey) ||
+          (i.type === "DEADLINE_TASK" && i.deadlineAt && toJSTKey(i.deadlineAt) === selectedKey)
       )
     : [];
 
@@ -96,6 +104,7 @@ export default function CalendarPage() {
             const key = keyForDay(day);
             const isToday = key === todayKey;
             const hasEvent = eventDays.has(key);
+            const hasDeadline = deadlineDays.has(key);
             const isSelected = key === selectedKey;
             return (
               <button
@@ -116,27 +125,51 @@ export default function CalendarPage() {
                 >
                   {day}
                 </span>
-                {hasEvent && (
-                  <span
-                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
-                      isSelected ? "bg-white dark:bg-zinc-900" : "bg-blue-400"
-                    }`}
-                  />
+                {/* Dot indicators: blue for events, orange for deadlines */}
+                {(hasEvent || hasDeadline) && (
+                  <div className="mt-0.5 flex gap-0.5">
+                    {hasEvent && (
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          isSelected ? "bg-white dark:bg-zinc-900" : "bg-blue-400"
+                        }`}
+                      />
+                    )}
+                    {hasDeadline && (
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          isSelected ? "bg-white dark:bg-zinc-900" : "bg-orange-400"
+                        }`}
+                      />
+                    )}
+                  </div>
                 )}
               </button>
             );
           })}
         </div>
 
+        {/* Legend */}
+        <div className="mt-3 flex items-center gap-4">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+            <span className="h-2 w-2 rounded-full bg-blue-400" />
+            予定
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+            <span className="h-2 w-2 rounded-full bg-orange-400" />
+            期限タスク
+          </div>
+        </div>
+
         {selectedKey && (
           <div className="mt-6">
             <h2 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-              {selectedLabel}の予定
+              {selectedLabel}の予定・期限
             </h2>
             {fetching ? (
               <p className="text-sm text-zinc-400">読み込み中...</p>
             ) : selectedItems.length === 0 ? (
-              <p className="text-sm text-zinc-400">この日の予定はありません</p>
+              <p className="text-sm text-zinc-400">この日の予定・期限はありません</p>
             ) : (
               <ul className="space-y-3">
                 {selectedItems.map((item) => (

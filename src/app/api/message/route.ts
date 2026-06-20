@@ -15,6 +15,12 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const SEP = "---DATA---";
 
+interface PendingItem {
+  type: string;
+  title: string;
+  content?: string;
+}
+
 function buildUpcomingSchedule(
   items: Array<{ type: string; title: string; startAt: Date | null; endAt: Date | null }>,
   days = 14
@@ -51,18 +57,35 @@ function buildSystem(
   nowLabel: string,
   itemsCtx: string,
   lastCtx: string,
-  upcomingSchedule: string
+  upcomingSchedule: string,
+  pendingItem?: PendingItem | null
 ) {
+  const pendingSection = pendingItem
+    ? `## ⚠️ 期限ヒアリング中（最優先で処理）:
+ユーザーは「${pendingItem.title}」の期限を答えています。
+ユーザーのメッセージから期限日時を解析し、このタスクをDEADLINE_TASKとして登録してください。
+- action: "register"
+- itemData.type: "DEADLINE_TASK"
+- itemData.title: "${pendingItem.title}"${pendingItem.content ? `\n- itemData.content: "${pendingItem.content}"` : ""}
+- itemData.deadlineAt: 解析した期限（JSTオフセット付きISO 8601）
+期限が読み取れない場合（「やっぱりいい」等）は action:"query" で返答してください。
+
+`
+    : "";
+
   return `あなたは「ポイッと」アプリのAIアシスタントです。
 現在の日時（JST）: ${nowLabel}
 
-ユーザーのメッセージを以下4種類に分類し、指定の形式で返答してください。
+${pendingSection}ユーザーのメッセージを以下の分類に分けて、指定の形式で返答してください。
 
 ## 分類の基準:
-- register: 新しい予定・タスク・メモ・アイデアを新規作成（「〇〇がある」「〇〇しなきゃ」等）
-- edit: 既存アイテムを更新（「〇〇に変えて」「修正して」等）
-- delete: 既存アイテムを削除（「消して」「削除して」等）
-- query: 登録済みデータへの質問（「〇〇は？」「空き時間は？」等）
+- register: 新しい予定・タスク・メモ・アイデアを新規作成
+- ask_deadline: タスク（TASK/DEADLINE_TASK）を登録しようとしているが、ユーザーのメッセージに具体的な期限が含まれていない場合
+  ※「今日中」「急いで」「今週中」等の表現は期限として扱い、直接registerにする
+  ※ EVENT・NOTE・IDEAには使わない
+- edit: 既存アイテムを更新
+- delete: 既存アイテムを削除
+- query: 登録済みデータへの質問
 
 ## 登録済みアイテム（IDと内容）:
 ${itemsCtx}
@@ -70,35 +93,40 @@ ${itemsCtx}
 ## 直近14日間のスケジュール（空き時間計算用）:
 ${upcomingSchedule}
 
-## 直前に操作したアイテム（「さっき」「直前の」「最後に登録した」の基準）:
+## 直前に操作したアイテム:
 ${lastCtx}
 
-## 空き時間の質問への回答ルール（「いつ空いてる？」「ご飯行けそう」等）:
-1. 対象期間を特定（今週・来週・今週末等）
+## 空き時間の質問への回答ルール:
+1. 対象期間を特定
 2. 各日のEVENTから空き時間を計算
 3. 「ご飯」「食事」「飲み」→ 18:00以降の枠のみ
-4. フォーマット: 冒頭1行コメント、箇条書きリスト（日付・曜日・時間帯）
 
-## 出力形式（必ずこの順序で出力）:
-自然な日本語返答（1〜2文。時刻・日付を必ず含める）
+## 出力形式（必ずこの順序）:
+自然な日本語返答（時刻・日付を含める）
 ${SEP}
-JSON（1行、コードブロック不要）
+JSON（1行）
 
 ## JSONスキーマ:
-register: {"action":"register","itemData":{"type":"EVENT"|"TASK"|"DEADLINE_TASK"|"NOTE"|"IDEA","title":"30文字以内","content":"省略可","startAt":"YYYY-MM-DDThh:mm:00+09:00","endAt":"省略可","deadlineAt":"省略可"}}
-edit: {"action":"edit","targetId":"末尾8桁","updateData":{"title":"省略可","type":"省略可","content":"省略可","startAt":"変更後またはnull","endAt":"変更後またはnull","deadlineAt":"変更後またはnull"}}
+register: {"action":"register","itemData":{"type":"EVENT"|"TASK"|"DEADLINE_TASK"|"NOTE"|"IDEA","title":"30文字以内","content":"省略可","startAt":"省略可","endAt":"省略可","deadlineAt":"省略可"}}
+ask_deadline: {"action":"ask_deadline","pendingItem":{"type":"TASK","title":"タスク名","content":"省略可"}}
+edit: {"action":"edit","targetId":"末尾8桁","updateData":{"title":"省略可","type":"省略可","content":"省略可","startAt":"省略可またはnull","endAt":"省略可またはnull","deadlineAt":"省略可またはnull"}}
 delete: {"action":"delete","targetId":"末尾8桁"}
 query: {"action":"query"}
 
-## 出力例（登録）:
+## 出力例（ask_deadline）:
+課題ですね。いつまでに終わらせる必要がありますか？
+${SEP}
+{"action":"ask_deadline","pendingItem":{"type":"TASK","title":"課題"}}
+
+## 出力例（期限付き登録）:
+課題を明日23時59分までのタスクとして登録しました。
+${SEP}
+{"action":"register","itemData":{"type":"DEADLINE_TASK","title":"課題","deadlineAt":"2026-06-21T23:59:00+09:00"}}
+
+## 出力例（通常登録）:
 テニスを今日9時から登録しました。
 ${SEP}
 {"action":"register","itemData":{"type":"EVENT","title":"テニス","startAt":"2026-06-20T09:00:00+09:00"}}
-
-## 出力例（質問）:
-明日は14時からミーティングがあります。
-${SEP}
-{"action":"query"}
 
 ## 注意:
 - 「さっき」「直前」「最後に」→ 直前に操作したアイテムのIDをtargetIdに使う
@@ -132,10 +160,11 @@ export async function POST(request: Request) {
           return;
         }
 
-        const { message, history, lastItemId } = (await request.json()) as {
+        const { message, history, lastItemId, pendingItem } = (await request.json()) as {
           message: string;
           history?: { role: "user" | "assistant"; content: string }[];
           lastItemId?: string | null;
+          pendingItem?: PendingItem | null;
         };
 
         let user = await prisma.user.findUnique({ where: { id: authUser.id } });
@@ -200,7 +229,7 @@ export async function POST(request: Request) {
         const claudeStream = anthropic.messages.stream({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1024,
-          system: buildSystem(jstNowLabel(), itemsCtx, lastCtx, upcomingSchedule),
+          system: buildSystem(jstNowLabel(), itemsCtx, lastCtx, upcomingSchedule, pendingItem),
           messages: msgs,
         });
 
@@ -224,7 +253,6 @@ export async function POST(request: Request) {
               if (replyPart) send({ t: "chunk", v: replyPart });
               cursor = sepAt + SEP.length;
             } else {
-              // Keep SEP.length-1 chars in reserve to detect separator across chunks
               const safeEnd = buffer.length - (SEP.length - 1);
               if (safeEnd > cursor) {
                 send({ t: "chunk", v: buffer.slice(cursor, safeEnd) });
@@ -234,22 +262,18 @@ export async function POST(request: Request) {
           }
         }
 
-        // Determine reply and JSON parts
         let jsonStr = "";
 
         if (sepAt !== -1) {
           jsonStr = buffer.slice(sepAt + SEP.length).trim();
         } else {
-          // Separator not found — try JSON fallback (graceful degradation)
           const cleaned = buffer
             .replace(/^```(?:json)?\s*/i, "")
             .replace(/\s*```\s*$/, "")
             .trim();
           try {
             const parsed = JSON.parse(cleaned) as { reply?: string; action?: string };
-            if (parsed.reply && cursor === 0) {
-              send({ t: "chunk", v: parsed.reply });
-            }
+            if (parsed.reply && cursor === 0) send({ t: "chunk", v: parsed.reply });
             jsonStr = cleaned;
           } catch {
             const remaining = buffer.slice(cursor).trim();
@@ -260,7 +284,7 @@ export async function POST(request: Request) {
         }
 
         let result: {
-          action: "register" | "edit" | "delete" | "query";
+          action: "register" | "edit" | "delete" | "query" | "ask_deadline";
           targetId?: string;
           itemData?: {
             type: ItemType;
@@ -278,6 +302,7 @@ export async function POST(request: Request) {
             endAt?: string | null;
             deadlineAt?: string | null;
           };
+          pendingItem?: PendingItem;
         };
 
         try {
@@ -293,6 +318,13 @@ export async function POST(request: Request) {
           return idMap.get(shortId) ?? null;
         }
 
+        // ── ask_deadline ──
+        if (result.action === "ask_deadline" && result.pendingItem) {
+          send({ t: "done", action: "ask_deadline", pendingItem: result.pendingItem });
+          return;
+        }
+
+        // ── register ──
         if (result.action === "register" && result.itemData) {
           const d = result.itemData;
           try {
@@ -315,6 +347,7 @@ export async function POST(request: Request) {
           return;
         }
 
+        // ── edit ──
         if (result.action === "edit" && result.updateData) {
           const targetId = resolveId(result.targetId) ?? lastItemId;
           if (!targetId) {
@@ -339,6 +372,7 @@ export async function POST(request: Request) {
           return;
         }
 
+        // ── delete ──
         if (result.action === "delete") {
           const targetId = resolveId(result.targetId) ?? lastItemId;
           if (!targetId) {
