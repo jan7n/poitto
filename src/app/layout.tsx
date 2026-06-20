@@ -45,7 +45,7 @@ export default async function RootLayout({
               className="flex-1"
               style={{
                 paddingTop: "calc(40px + env(safe-area-inset-top))",
-                paddingBottom: "calc(72px + env(safe-area-inset-bottom))",
+                paddingBottom: "calc(88px + env(safe-area-inset-bottom))",
               }}
             >
               {children}

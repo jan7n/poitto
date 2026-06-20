@@ -272,7 +272,7 @@ export default function Home() {
       {/* Input area */}
       <div
         className="fixed left-0 right-0 z-40 bg-[#F5F4EF] border-t border-stone-200"
-        style={{ bottom: "calc(68px + env(safe-area-inset-bottom))" }}
+        style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
       >
         {pendingItem && (
           <div className="mx-auto max-w-2xl px-4 pt-2.5">
