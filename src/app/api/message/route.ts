@@ -145,16 +145,28 @@ export async function POST(request: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.upsert({
-      where: { id: authUser.id },
-      update: { email: authUser.email ?? "" },
-      create: { id: authUser.id, email: authUser.email ?? "" },
-    });
+    // Ensure User record exists (create on first message only)
+    let user = await prisma.user.findUnique({ where: { id: authUser.id } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: { id: authUser.id, email: authUser.email ?? "" },
+      });
+    }
 
+    // Fetch only fields needed for AI context (skip content/rawInput to reduce payload)
     const items = await prisma.item.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 60,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        startAt: true,
+        endAt: true,
+        deadlineAt: true,
+        completed: true,
+      },
     });
 
     // Include short IDs in context so Claude can reference them

@@ -116,13 +116,6 @@ export async function GET() {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Ensure User record exists
-    await prisma.user.upsert({
-      where: { id: authUser.id },
-      update: { email: authUser.email ?? "" },
-      create: { id: authUser.id, email: authUser.email ?? "" },
-    });
-
     const items = await prisma.item.findMany({
       where: { userId: authUser.id },
       orderBy: { createdAt: "desc" },

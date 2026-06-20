@@ -33,9 +33,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const supabase = await createSupabaseServerClient();
+  // getSession() reads from cookie without a network round-trip (faster than getUser())
+  // Security is enforced in each API route via getUser()
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   return (
     <html

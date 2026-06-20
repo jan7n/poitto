@@ -83,10 +83,10 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Only pass real messages (not the loading sentinel) as history
+      // Pass last 8 messages as history (shorter prompt = faster Claude response)
       const history = messages
         .filter((m) => m.id !== "welcome")
-        .slice(-12)
+        .slice(-8)
         .map((m) => ({ role: m.role, content: m.content }));
 
       const res = await fetch("/api/message", {
