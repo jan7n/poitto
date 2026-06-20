@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -25,7 +25,7 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — important: do not add logic between createServerClient and getUser
+  // Refresh session — do not add logic between createServerClient and getUser
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -34,7 +34,7 @@ export async function middleware(request: NextRequest) {
   const isLoginPage = pathname === "/login";
   const isApiRoute = pathname.startsWith("/api/");
 
-  // Unauthenticated → redirect to login (except login page itself and API routes)
+  // Unauthenticated → redirect to login (except login page and API routes)
   if (!user && !isLoginPage && !isApiRoute) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
@@ -49,7 +49,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and static assets
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
