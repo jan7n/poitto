@@ -148,7 +148,8 @@ export default function Home() {
                     )
                   );
                   setLastItemId(event.item.id);
-                  refreshItems();
+                  // show just displays existing data — no refresh needed
+                  if (event.action !== "show") refreshItems();
                 } else if (event.action === "delete") {
                   if (event.deletedId === lastItemId) setLastItemId(null);
                   refreshItems();

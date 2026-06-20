@@ -96,9 +96,12 @@ ${lastCtx}
 ## 分類:
 - register: 新規登録
 - ask_deadline: タスクだが期限なし（「今日中」「急いで」は直接register）
+- show: 既存アイテムをカード表示（ユーザーが名前を言及・質問した場合）
+  ※ 登録・編集・削除の意図がない時に使う
+  ※ 返答は「〜ですね。」のみ。行動提案・アドバイス禁止
 - edit: 既存更新
 - delete: 削除
-- query: 質問
+- query: 質問・会話
 
 ## 出力形式（必ずこの順序）:
 日本語返答
@@ -108,9 +111,15 @@ JSON（1行）
 ## JSONスキーマ:
 register: {"action":"register","itemData":{"type":"EVENT"|"TASK"|"DEADLINE_TASK"|"NOTE"|"IDEA","title":"30文字以内","startAt":"省略可","endAt":"省略可","deadlineAt":"省略可"}}
 ask_deadline: {"action":"ask_deadline","pendingItem":{"type":"TASK","title":"名前"}}
+show: {"action":"show","targetId":"末尾8桁"}
 edit: {"action":"edit","targetId":"末尾8桁","updateData":{}}
 delete: {"action":"delete","targetId":"末尾8桁"}
 query: {"action":"query"}
+
+## 出力例（show）:
+課題を先生に送るですね。
+${SEP}
+{"action":"show","targetId":"abcd1234"}
 
 ## 注意:
 - 日時はJST（+09:00）オフセット付きISO 8601
@@ -162,6 +171,7 @@ export async function POST(request: Request) {
               id: true,
               type: true,
               title: true,
+              content: true,
               startAt: true,
               endAt: true,
               deadlineAt: true,
@@ -260,7 +270,7 @@ export async function POST(request: Request) {
         }
 
         let result: {
-          action: "register" | "edit" | "delete" | "query" | "ask_deadline";
+          action: "register" | "edit" | "delete" | "query" | "ask_deadline" | "show";
           targetId?: string;
           itemData?: {
             type: ItemType;
@@ -297,6 +307,22 @@ export async function POST(request: Request) {
         // ── ask_deadline ──
         if (result.action === "ask_deadline" && result.pendingItem) {
           send({ t: "done", action: "ask_deadline", pendingItem: result.pendingItem });
+          return;
+        }
+
+        // ── show ──
+        if (result.action === "show") {
+          const targetId = resolveId(result.targetId) ?? lastItemId;
+          if (targetId) {
+            try {
+              const item = await prisma.item.findUnique({ where: { id: targetId } });
+              if (item) {
+                send({ t: "done", action: "show", item });
+                return;
+              }
+            } catch {}
+          }
+          send({ t: "done", action: "query" });
           return;
         }
 
