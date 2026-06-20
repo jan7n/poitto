@@ -131,9 +131,14 @@ ${lastCtx}
   ※ 既存のcontentがある場合は「既存の内容\n新しい情報」と追記すること
   ※ 編集後のアイテムがチャットにカード表示される
 - delete: 1件削除
-- delete_group: 複数アイテムを一括削除（例:「課題全部終わった」「〜全部削除して」）
-  ※ targetIds に対象の末尾8桁IDをすべて列挙する
-  ※ 確認不要。即削除して削除済みリストを表示する
+- delete_group: 複数アイテムを一括削除
+  【重要】以下の表現はすべて delete_group を使う（完了・終了・済み = このアプリでは削除）:
+  「〜全部終わった」「〜全部やった」「〜全部できた」「〜全部済ませた」
+  「〜消して」「〜全部削除して」「〜片付いた」「〜終わったから消して」
+  JSON には必ず keyword と targetIds を両方含める:
+  ・keyword: タイトルに含まれる検索キーワード（例: "課題"）
+  ・targetIds: 登録済みアイテムから一致するTASK/DEADLINE_TASKの末尾8桁IDをすべて列挙
+  例:「課題全部終わった！」→ keyword:"課題", targetIds に課題タスクのID全部
 - restore: 最近削除されたアイテムをUNDO（「〜を戻して」「復活させて」）
   ※ 「最近削除されたアイテム」から該当のIDを特定する
 - query: 質問・会話
@@ -149,7 +154,7 @@ ask_deadline: {"action":"ask_deadline","pendingItem":{"type":"TASK","title":"名
 show: {"action":"show","targetId":"末尾8桁"}
 edit: {"action":"edit","targetId":"末尾8桁","updateData":{}}
 delete: {"action":"delete","targetId":"末尾8桁"}
-delete_group: {"action":"delete_group","targetIds":["末尾8桁1","末尾8桁2"]}
+delete_group: {"action":"delete_group","keyword":"キーワード","targetIds":["末尾8桁1","末尾8桁2"]}
 restore: {"action":"restore","targetId":"末尾8桁（元のID）"}
 query: {"action":"query"}
 
@@ -161,7 +166,7 @@ ${SEP}
 ## 出力例（delete_group）:
 以下の課題タスクを削除しました。
 ${SEP}
-{"action":"delete_group","targetIds":["abcd1234","ef567890","12345678"]}
+{"action":"delete_group","keyword":"課題","targetIds":["abcd1234","ef567890","12345678"]}
 
 ## 注意:
 - 日時はJST（+09:00）オフセット付きISO 8601
@@ -317,6 +322,7 @@ export async function POST(request: Request) {
           action: "register" | "edit" | "delete" | "delete_group" | "restore" | "query" | "ask_deadline" | "show";
           targetId?: string;
           targetIds?: string[];
+          keyword?: string;
           itemData?: {
             type: ItemType;
             title: string;
@@ -342,6 +348,9 @@ export async function POST(request: Request) {
           send({ t: "done", action: "query" });
           return;
         }
+
+        // Debug: log every action to Vercel function logs
+        console.log("[poitto/message]", result.action, JSON.stringify(result).slice(0, 300));
 
         function resolveId(shortId?: string): string | null {
           if (!shortId) return null;
@@ -436,10 +445,29 @@ export async function POST(request: Request) {
         }
 
         // ── delete_group ──
-        if (result.action === "delete_group" && result.targetIds?.length) {
-          const ids = result.targetIds
+        if (result.action === "delete_group") {
+          // Primary: resolve explicit IDs
+          let ids: string[] = (result.targetIds ?? [])
             .map((s) => resolveId(s))
             .filter((id): id is string => id !== null);
+
+          // Fallback: keyword search in title when IDs are missing/wrong
+          if (ids.length === 0 && result.keyword) {
+            const kw = result.keyword.trim();
+            console.log("[poitto/delete_group] keyword fallback:", kw);
+            const matching = await prisma.item.findMany({
+              where: {
+                userId: authUser.id,
+                title: { contains: kw },
+                type: { in: ["TASK", "DEADLINE_TASK"] },
+                completed: false,
+              },
+              select: { id: true },
+            });
+            ids = matching.map((i) => i.id);
+          }
+
+          console.log("[poitto/delete_group] resolved ids:", ids);
 
           if (ids.length === 0) { send({ t: "done", action: "query" }); return; }
 
@@ -451,8 +479,10 @@ export async function POST(request: Request) {
             await prisma.item.deleteMany({
               where: { id: { in: ids }, userId: authUser.id },
             });
+            console.log("[poitto/delete_group] deleted:", toDelete.map((i) => i.title));
             send({ t: "done", action: "delete_group", items: toDelete });
-          } catch {
+          } catch (e) {
+            console.error("[poitto/delete_group] error:", e);
             send({ t: "done", action: "query" });
           }
           return;
