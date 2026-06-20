@@ -8,7 +8,6 @@ const NAV = [
   { href: "/today", label: "今日", icon: SunIcon },
   { href: "/calendar", label: "カレンダ", icon: CalendarIcon },
   { href: "/tasks", label: "タスク", icon: CheckIcon },
-  { href: "/notes", label: "メモ", icon: NoteIcon },
 ];
 
 export default function BottomNav() {
@@ -96,16 +95,3 @@ function CheckIcon({ active }: { active: boolean }) {
   );
 }
 
-function NoteIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"
-      className={active ? "text-stone-800" : "text-stone-400"}>
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
-    </svg>
-  );
-}
