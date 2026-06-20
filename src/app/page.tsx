@@ -433,7 +433,7 @@ function MiniItemCard({ item }: { item: Item }) {
   if (item.type === "EVENT" && item.startAt) {
     dateText = item.endAt
       ? `${fmtDateTime(item.startAt)} 〜 ${fmtTime(item.endAt)}`
-      : fmtDateTime(item.startAt);
+      : `${fmtDateTime(item.startAt)} 〜`;
   } else if (item.type === "DEADLINE_TASK" || item.type === "TASK") {
     const date = item.deadlineAt ?? item.startAt;
     if (date) dateText = `${item.deadlineAt ? "期限" : "日時"}: ${fmtDateTime(date)}`;

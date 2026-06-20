@@ -60,7 +60,7 @@ function getDateInfo(item: Item): { text: string; color: string } | null {
   if (item.type === "EVENT" && item.startAt) {
     const text = item.endAt
       ? `${fmtDateTime(item.startAt)} 〜 ${fmtTime(item.endAt)}`
-      : fmtDateTime(item.startAt);
+      : `${fmtDateTime(item.startAt)} 〜`;
     return { text, color: "text-sky-600" };
   }
   if (item.type === "DEADLINE_TASK" || item.type === "TASK") {

@@ -47,7 +47,7 @@ function buildUpcomingSchedule(
     const key = toJSTKey(item.startAt);
     if (!byDay[key]) byDay[key] = [];
     const s = fmtTime(item.startAt);
-    const e = item.endAt ? ` 〜 ${fmtTime(item.endAt)}` : "";
+    const e = item.endAt ? ` 〜 ${fmtTime(item.endAt)}` : " 〜";
     byDay[key].push(`${item.title}（${s}${e}）`);
   }
 
@@ -103,10 +103,9 @@ function buildSystem(
 ${pendingSection}【文体ルール・最重要】
 ・マークダウン記号（**、*、#、---、_、\`）は絶対に使わない
 ・箇条書きは「・」を使う
-・日程の空き時間を答える時は以下の形式（改行+字下げ）:
+・日程を答える時はDBに登録された予定のみ列挙する（空き時間の推測・補完禁止）:
   6月21日（日）
-  ・20:00 さなみとこはん
-  ・それ以外は空いています
+  ・20:00 さなみとこはん（終了時刻不明の場合は「20:00〜」と表記）
 ・1〜3文で簡潔に。長い文を一文に詰め込まない
 
 ## 登録済みアイテム:
