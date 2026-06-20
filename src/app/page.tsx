@@ -1,65 +1,301 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { TYPE_COLOR, TYPE_LABEL, type Item } from "@/lib/types";
+import { fmtDate, fmtDateTime, fmtTime } from "@/lib/jst";
+
+interface ConvMsg {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  item?: Item;
+}
+
+const WELCOME: ConvMsg = {
+  id: "welcome",
+  role: "assistant",
+  content:
+    "こんにちは！予定・タスク・メモ・アイデアはなんでも入力してください。\n「明日の予定は？」のような質問もOKです。",
+};
+
+const STORAGE_KEY = "poitto-chat-v1";
 
 export default function Home() {
+  const [messages, setMessages] = useState<ConvMsg[]>([WELCOME]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [lastItemId, setLastItemId] = useState<string | null>(null);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { messages: ConvMsg[]; lastItemId: string | null };
+      if (saved.messages?.length > 0) setMessages(saved.messages);
+      if (saved.lastItemId) setLastItemId(saved.lastItemId);
+    } catch {}
+  }, []);
+
+  // Persist chat history on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ messages: messages.slice(-60), lastItemId })
+      );
+    } catch {}
+  }, [messages, lastItemId]);
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  function resizeTextarea() {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+  }
+
+  async function submit() {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    // Clear input and reset textarea height
+    setInput("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
+    const userMsg: ConvMsg = { id: `u-${Date.now()}`, role: "user", content: text };
+    const loadingId = `l-${Date.now()}`;
+
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      { id: loadingId, role: "assistant", content: "" },
+    ]);
+    setLoading(true);
+
+    try {
+      // Only pass real messages (not the loading sentinel) as history
+      const history = messages
+        .filter((m) => m.id !== "welcome")
+        .slice(-12)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const res = await fetch("/api/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history, lastItemId }),
+      });
+
+      const data = (await res.json()) as {
+        action?: string;
+        reply?: string;
+        item?: Item;
+        deletedId?: string;
+        error?: string;
+      };
+
+      const reply = data.reply ?? data.error ?? "エラーが発生しました。";
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === loadingId
+            ? { ...m, content: reply, item: data.item }
+            : m
+        )
+      );
+
+      if (data.action === "register" || data.action === "edit") {
+        if (data.item) setLastItemId(data.item.id);
+      } else if (data.action === "delete") {
+        if (data.deletedId && data.deletedId === lastItemId) setLastItemId(null);
+      }
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === loadingId
+            ? { ...m, content: "エラーが発生しました。もう一度お試しください。" }
+            : m
+        )
+      );
+    } finally {
+      setLoading(false);
+      textareaRef.current?.focus();
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      {/* ── Message area ── */}
+      <div className="mx-auto max-w-2xl px-4 pt-6">
+        <div className="space-y-3">
+          {messages.map((msg) =>
+            msg.role === "user" ? (
+              <UserBubble key={msg.id} content={msg.content} />
+            ) : (
+              <AssistantBubble
+                key={msg.id}
+                content={msg.content}
+                item={msg.item}
+                isLoading={msg.content === "" && loading}
+              />
+            )
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        {/* Spacer: must be tall enough to scroll last message above fixed input */}
+        <div ref={bottomRef} className="h-44" aria-hidden="true" />
+      </div>
+
+      {/* ── Fixed input bar (sits above BottomNav) ── */}
+      <div className="fixed bottom-14 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95">
+        <div className="mx-auto flex max-w-2xl items-end gap-2 px-4 py-3">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            disabled={loading}
+            rows={1}
+            placeholder="予定やタスクを入力、または質問…"
+            className="flex-1 resize-none rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition-[height] focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:ring-zinc-800"
+            style={{ minHeight: "44px", maxHeight: "160px" }}
+            onChange={(e) => {
+              setInput(e.target.value);
+              resizeTextarea();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={loading || !input.trim()}
+            aria-label="送信"
+            className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white shadow transition-colors hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <SendIcon />
+          </button>
         </div>
-      </main>
+      </div>
+    </>
+  );
+}
+
+/* ── Sub-components ── */
+
+function UserBubble({ content }: { content: string }) {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-zinc-900 px-4 py-2.5 dark:bg-zinc-100">
+        <p className="whitespace-pre-wrap text-sm text-white dark:text-zinc-900">
+          {content}
+        </p>
+      </div>
     </div>
+  );
+}
+
+function AssistantBubble({
+  content,
+  item,
+  isLoading,
+}: {
+  content: string;
+  item?: Item;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-700 dark:bg-zinc-900">
+        {isLoading ? (
+          <ThinkingDots />
+        ) : (
+          <>
+            <p className="whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">
+              {content}
+            </p>
+            {item && <MiniItemCard item={item} />}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniItemCard({ item }: { item: Item }) {
+  let dateText = "";
+  if (item.type === "EVENT" && item.startAt) {
+    dateText = item.endAt
+      ? `${fmtDateTime(item.startAt)} 〜 ${fmtTime(item.endAt)}`
+      : fmtDate(item.startAt);
+  } else if (item.type === "DEADLINE_TASK" && item.deadlineAt) {
+    dateText = `期限: ${fmtDate(item.deadlineAt)}`;
+  }
+
+  return (
+    <div className="mt-2 rounded-xl border border-zinc-100 bg-zinc-50 p-2.5 dark:border-zinc-700 dark:bg-zinc-800">
+      <div className="flex items-center gap-1.5">
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLOR[item.type]}`}
+        >
+          {TYPE_LABEL[item.type]}
+        </span>
+        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+          {item.title}
+        </span>
+      </div>
+      {item.content && (
+        <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-1">
+          {item.content}
+        </p>
+      )}
+      {dateText && (
+        <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+          {dateText}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ThinkingDots() {
+  return (
+    <div className="flex gap-1 py-0.5">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="h-2 w-2 animate-bounce rounded-full bg-zinc-300 dark:bg-zinc-600"
+          style={{ animationDelay: `${i * 150}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
   );
 }
