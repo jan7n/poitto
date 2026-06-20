@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { TYPE_COLOR, TYPE_LABEL, type Item } from "@/lib/types";
-import { fmtDate, fmtDateTime, fmtTime } from "@/lib/jst";
+import { fmtDateTime, fmtTime } from "@/lib/jst";
 import { useItems } from "@/components/ItemsProvider";
 
 interface ConvMsg {
@@ -307,7 +307,7 @@ function MiniItemCard({ item }: { item: Item }) {
       ? `${fmtDateTime(item.startAt)} 〜 ${fmtTime(item.endAt)}`
       : fmtDateTime(item.startAt);
   } else if (item.type === "DEADLINE_TASK" && item.deadlineAt) {
-    dateText = `期限: ${fmtDate(item.deadlineAt)}`;
+    dateText = `期限: ${fmtDateTime(item.deadlineAt)}`;
   }
 
   return (

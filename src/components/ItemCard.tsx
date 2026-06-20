@@ -68,7 +68,7 @@ function getDateInfo(item: Item): { text: string; color: string } | null {
   if (item.type === "DEADLINE_TASK" && item.deadlineAt) {
     const overdue = new Date(item.deadlineAt) < new Date();
     return {
-      text: `期限: ${fmtDate(item.deadlineAt)}`,
+      text: `期限: ${fmtDateTime(item.deadlineAt)}`,
       color: overdue && !item.completed
         ? "text-red-600 dark:text-red-400"
         : "text-orange-600 dark:text-orange-400",

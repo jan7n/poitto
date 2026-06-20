@@ -327,6 +327,12 @@ export async function POST(request: Request) {
         // ── register ──
         if (result.action === "register" && result.itemData) {
           const d = result.itemData;
+          // When resolving a pending deadline inquiry, force DEADLINE_TASK regardless of AI output
+          if (pendingItem) {
+            d.type = "DEADLINE_TASK";
+            if (!d.title) d.title = pendingItem.title;
+            if (!d.content && pendingItem.content) d.content = pendingItem.content;
+          }
           try {
             const item = await prisma.item.create({
               data: {
