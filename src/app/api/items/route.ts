@@ -118,6 +118,19 @@ export async function GET() {
       where: { userId: authUser.id },
       orderBy: { createdAt: "desc" },
       take: 50,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        content: true,
+        startAt: true,
+        endAt: true,
+        deadlineAt: true,
+        completed: true,
+        completedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     return Response.json(items);

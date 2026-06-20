@@ -29,7 +29,6 @@ export default function Home() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load chat history from localStorage on mount
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -40,7 +39,6 @@ export default function Home() {
     } catch {}
   }, []);
 
-  // Persist chat history on every change
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -50,7 +48,6 @@ export default function Home() {
     } catch {}
   }, [messages, lastItemId]);
 
-  // Scroll to bottom whenever messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -66,11 +63,8 @@ export default function Home() {
     const text = input.trim();
     if (!text || loading) return;
 
-    // Clear input and reset textarea height
     setInput("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     const userMsg: ConvMsg = { id: `u-${Date.now()}`, role: "user", content: text };
     const loadingId = `l-${Date.now()}`;
@@ -83,7 +77,6 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Pass last 8 messages as history (shorter prompt = faster Claude response)
       const history = messages
         .filter((m) => m.id !== "welcome")
         .slice(-8)
@@ -95,28 +88,64 @@ export default function Home() {
         body: JSON.stringify({ message: text, history, lastItemId }),
       });
 
-      const data = (await res.json()) as {
-        action?: string;
-        reply?: string;
-        item?: Item;
-        deletedId?: string;
-        error?: string;
-      };
+      if (!res.ok || !res.body) throw new Error("Network error");
 
-      const reply = data.reply ?? data.error ?? "エラーが発生しました。";
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === loadingId
-            ? { ...m, content: reply, item: data.item }
-            : m
-        )
-      );
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      if (data.action === "register" || data.action === "edit") {
-        if (data.item) setLastItemId(data.item.id);
-      } else if (data.action === "delete") {
-        if (data.deletedId && data.deletedId === lastItemId) setLastItemId(null);
+        buf += decoder.decode(value, { stream: true });
+
+        // Parse complete SSE events (delimited by \n\n)
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as {
+              t: string;
+              v?: string;
+              action?: string;
+              item?: Item;
+              deletedId?: string;
+              message?: string;
+            };
+
+            if (event.t === "chunk" && event.v) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === loadingId ? { ...m, content: m.content + event.v } : m
+                )
+              );
+            } else if (event.t === "done") {
+              if (event.item) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === loadingId ? { ...m, item: event.item } : m
+                  )
+                );
+                setLastItemId(event.item.id);
+              } else if (
+                event.action === "delete" &&
+                event.deletedId === lastItemId
+              ) {
+                setLastItemId(null);
+              }
+            } else if (event.t === "error" && event.message) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === loadingId ? { ...m, content: event.message! } : m
+                )
+              );
+            }
+          } catch {}
+        }
       }
     } catch {
       setMessages((prev) =>
@@ -134,7 +163,6 @@ export default function Home() {
 
   return (
     <>
-      {/* ── Message area ── */}
       <div className="mx-auto max-w-2xl px-4 pt-6">
         <div className="space-y-3">
           {messages.map((msg) =>
@@ -150,11 +178,9 @@ export default function Home() {
             )
           )}
         </div>
-        {/* Spacer: must be tall enough to scroll last message above fixed input */}
         <div ref={bottomRef} className="h-44" aria-hidden="true" />
       </div>
 
-      {/* ── Fixed input bar (sits above BottomNav 72px + safe area) ── */}
       <div
         className="fixed left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95"
         style={{ bottom: "calc(72px + env(safe-area-inset-bottom))" }}
@@ -163,10 +189,9 @@ export default function Home() {
           <textarea
             ref={textareaRef}
             value={input}
-            disabled={loading}
             rows={1}
             placeholder="予定やタスクを入力、または質問…"
-            className="flex-1 resize-none rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition-[height] focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:ring-zinc-800"
+            className="flex-1 resize-none rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition-[height] focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:ring-zinc-800"
             style={{ minHeight: "44px", maxHeight: "160px" }}
             onChange={(e) => {
               setInput(e.target.value);
@@ -193,8 +218,6 @@ export default function Home() {
     </>
   );
 }
-
-/* ── Sub-components ── */
 
 function UserBubble({ content }: { content: string }) {
   return (
@@ -240,7 +263,7 @@ function MiniItemCard({ item }: { item: Item }) {
   if (item.type === "EVENT" && item.startAt) {
     dateText = item.endAt
       ? `${fmtDateTime(item.startAt)} 〜 ${fmtTime(item.endAt)}`
-      : fmtDate(item.startAt);
+      : fmtDateTime(item.startAt);
   } else if (item.type === "DEADLINE_TASK" && item.deadlineAt) {
     dateText = `期限: ${fmtDate(item.deadlineAt)}`;
   }
