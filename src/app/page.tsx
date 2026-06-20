@@ -5,11 +5,17 @@ import { TYPE_COLOR, TYPE_LABEL, type Item } from "@/lib/types";
 import { fmtDateTime, fmtTime } from "@/lib/jst";
 import { useItems } from "@/components/ItemsProvider";
 
+interface DeletedEntry {
+  item: Item;
+  deletedAt: number;
+}
+
 interface ConvMsg {
   id: string;
   role: "user" | "assistant";
   content: string;
   item?: Item;
+  deletedItems?: Item[];
 }
 
 interface PendingItem {
@@ -26,6 +32,8 @@ const WELCOME: ConvMsg = {
 };
 
 const STORAGE_KEY = "poitto-chat-v1";
+const DELETED_KEY = "poitto-deleted-v1";
+const UNDO_TTL = 30 * 60 * 1000; // 30 minutes
 
 export default function Home() {
   const { refresh: refreshItems } = useItems();
@@ -34,6 +42,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [lastItemId, setLastItemId] = useState<string | null>(null);
   const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
+  const [deletedBuffer, setDeletedBuffer] = useState<DeletedEntry[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -41,15 +50,23 @@ export default function Home() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as {
-        messages: ConvMsg[];
-        lastItemId: string | null;
-        pendingItem?: PendingItem | null;
-      };
-      if (saved.messages?.length > 0) setMessages(saved.messages);
-      if (saved.lastItemId) setLastItemId(saved.lastItemId);
-      if (saved.pendingItem) setPendingItem(saved.pendingItem);
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          messages: ConvMsg[];
+          lastItemId: string | null;
+          pendingItem?: PendingItem | null;
+        };
+        if (saved.messages?.length > 0) setMessages(saved.messages);
+        if (saved.lastItemId) setLastItemId(saved.lastItemId);
+        if (saved.pendingItem) setPendingItem(saved.pendingItem);
+      }
+
+      const rawDel = localStorage.getItem(DELETED_KEY);
+      if (rawDel) {
+        const buf = JSON.parse(rawDel) as DeletedEntry[];
+        const fresh = buf.filter((d) => Date.now() - d.deletedAt < UNDO_TTL);
+        setDeletedBuffer(fresh);
+      }
     } catch {}
   }, []);
 
@@ -61,6 +78,12 @@ export default function Home() {
       );
     } catch {}
   }, [messages, lastItemId, pendingItem]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DELETED_KEY, JSON.stringify(deletedBuffer));
+    } catch {}
+  }, [deletedBuffer]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -96,10 +119,15 @@ export default function Home() {
         .slice(-8)
         .map((m) => ({ role: m.role, content: m.content }));
 
+      const now = Date.now();
+      const recentlyDeleted = deletedBuffer
+        .filter((d) => now - d.deletedAt < UNDO_TTL)
+        .map((d) => d.item);
+
       const res = await fetch("/api/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history, lastItemId, pendingItem }),
+        body: JSON.stringify({ message: text, history, lastItemId, pendingItem, recentlyDeleted }),
       });
 
       if (!res.ok || !res.body) throw new Error("Network error");
@@ -125,7 +153,9 @@ export default function Home() {
               v?: string;
               action?: string;
               item?: Item;
+              items?: Item[];
               deletedId?: string;
+              originalId?: string;
               message?: string;
               pendingItem?: PendingItem;
             };
@@ -139,6 +169,31 @@ export default function Home() {
             } else if (event.t === "done") {
               if (event.action === "ask_deadline" && event.pendingItem) {
                 setPendingItem(event.pendingItem);
+              } else if (event.action === "delete_group" && event.items) {
+                const ts = Date.now();
+                const newEntries = event.items.map((item) => ({ item, deletedAt: ts }));
+                setDeletedBuffer((prev) => {
+                  const fresh = prev.filter((d) => ts - d.deletedAt < UNDO_TTL);
+                  return [...fresh, ...newEntries];
+                });
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === loadingId ? { ...m, deletedItems: event.items } : m
+                  )
+                );
+                setLastItemId(null);
+                refreshItems();
+              } else if (event.action === "restore" && event.item) {
+                setDeletedBuffer((prev) =>
+                  prev.filter((d) => d.item.id !== event.originalId)
+                );
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === loadingId ? { ...m, item: event.item } : m
+                  )
+                );
+                setLastItemId(event.item.id);
+                refreshItems();
               } else {
                 setPendingItem(null);
                 if (event.item) {
@@ -152,6 +207,14 @@ export default function Home() {
                   if (event.action !== "show") refreshItems();
                 } else if (event.action === "delete") {
                   if (event.deletedId === lastItemId) setLastItemId(null);
+                  // item data returned from single delete — add to undo buffer
+                  if (event.item) {
+                    const ts = Date.now();
+                    setDeletedBuffer((prev) => {
+                      const fresh = prev.filter((d) => ts - d.deletedAt < UNDO_TTL);
+                      return [...fresh, { item: event.item!, deletedAt: ts }];
+                    });
+                  }
                   refreshItems();
                 }
               }
@@ -192,6 +255,7 @@ export default function Home() {
                 key={msg.id}
                 content={msg.content}
                 item={msg.item}
+                deletedItems={msg.deletedItems}
                 isLoading={msg.content === "" && loading}
               />
             )
@@ -288,10 +352,12 @@ function UserBubble({ content }: { content: string }) {
 function AssistantBubble({
   content,
   item,
+  deletedItems,
   isLoading,
 }: {
   content: string;
   item?: Item;
+  deletedItems?: Item[];
   isLoading: boolean;
 }) {
   return (
@@ -303,9 +369,36 @@ function AssistantBubble({
           <>
             <p className="whitespace-pre-wrap text-sm text-stone-700 leading-relaxed">{cleanMarkdown(content)}</p>
             {item && <MiniItemCard item={item} />}
+            {deletedItems && deletedItems.length > 0 && (
+              <DeletedItemList items={deletedItems} />
+            )}
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function DeletedItemList({ items }: { items: Item[] }) {
+  return (
+    <div className="mt-2 space-y-1">
+      {items.map((item) => {
+        const date = item.deadlineAt ?? item.startAt;
+        return (
+          <div
+            key={item.id}
+            className="flex items-center gap-2 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2"
+          >
+            <span className="shrink-0 text-stone-300">□</span>
+            <span className="flex-1 text-xs text-stone-500">{item.title}</span>
+            {date && (
+              <span className="shrink-0 text-[11px] text-stone-400">
+                {fmtDateTime(new Date(date))}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

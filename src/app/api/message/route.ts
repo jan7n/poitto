@@ -21,6 +21,19 @@ interface PendingItem {
   content?: string;
 }
 
+interface DeletedItemData {
+  id: string;
+  type: ItemType;
+  title: string;
+  rawInput?: string;
+  content?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  deadlineAt?: string | null;
+  completed: boolean;
+  completedAt?: string | null;
+}
+
 function buildUpcomingSchedule(
   items: Array<{ type: string; title: string; startAt: Date | null; endAt: Date | null }>,
   days = 14
@@ -58,7 +71,8 @@ function buildSystem(
   itemsCtx: string,
   lastCtx: string,
   upcomingSchedule: string,
-  pendingItem?: PendingItem | null
+  pendingItem?: PendingItem | null,
+  recentlyDeleted?: DeletedItemData[]
 ) {
   const pendingSection = pendingItem
     ? `最優先: 「${pendingItem.title}」の期限ヒアリング中。
@@ -71,6 +85,17 @@ function buildSystem(
 
 `
     : "";
+
+  const recentlyDeletedCtx =
+    recentlyDeleted && recentlyDeleted.length > 0
+      ? `\n## 最近削除されたアイテム（UNDO可能）:\n${recentlyDeleted
+          .map((d) => {
+            const parts = [`${d.id.slice(-8)} [${d.type}] ${d.title}`];
+            if (d.deadlineAt) parts.push(`期限:${d.deadlineAt}`);
+            return parts.join(" ");
+          })
+          .join("\n")}\n`
+      : "";
 
   return `あなたは「ポイッと」アプリのAIアシスタントです。
 現在の日時（JST）: ${nowLabel}
@@ -86,7 +111,7 @@ ${pendingSection}【文体ルール・最重要】
 
 ## 登録済みアイテム:
 ${itemsCtx}
-
+${recentlyDeletedCtx}
 ## 直近14日間:
 ${upcomingSchedule}
 
@@ -105,7 +130,12 @@ ${lastCtx}
      → "さなみさんとご飯"を特定し updateData.content を設定
   ※ 既存のcontentがある場合は「既存の内容\n新しい情報」と追記すること
   ※ 編集後のアイテムがチャットにカード表示される
-- delete: 削除
+- delete: 1件削除
+- delete_group: 複数アイテムを一括削除（例:「課題全部終わった」「〜全部削除して」）
+  ※ targetIds に対象の末尾8桁IDをすべて列挙する
+  ※ 確認不要。即削除して削除済みリストを表示する
+- restore: 最近削除されたアイテムをUNDO（「〜を戻して」「復活させて」）
+  ※ 「最近削除されたアイテム」から該当のIDを特定する
 - query: 質問・会話
 
 ## 出力形式（必ずこの順序）:
@@ -119,12 +149,19 @@ ask_deadline: {"action":"ask_deadline","pendingItem":{"type":"TASK","title":"名
 show: {"action":"show","targetId":"末尾8桁"}
 edit: {"action":"edit","targetId":"末尾8桁","updateData":{}}
 delete: {"action":"delete","targetId":"末尾8桁"}
+delete_group: {"action":"delete_group","targetIds":["末尾8桁1","末尾8桁2"]}
+restore: {"action":"restore","targetId":"末尾8桁（元のID）"}
 query: {"action":"query"}
 
 ## 出力例（show）:
 課題を先生に送るですね。
 ${SEP}
 {"action":"show","targetId":"abcd1234"}
+
+## 出力例（delete_group）:
+以下の課題タスクを削除しました。
+${SEP}
+{"action":"delete_group","targetIds":["abcd1234","ef567890","12345678"]}
 
 ## 注意:
 - 日時はJST（+09:00）オフセット付きISO 8601
@@ -154,11 +191,12 @@ export async function POST(request: Request) {
           return;
         }
 
-        const { message, history, lastItemId, pendingItem } = (await request.json()) as {
+        const { message, history, lastItemId, pendingItem, recentlyDeleted } = (await request.json()) as {
           message: string;
           history?: { role: "user" | "assistant"; content: string }[];
           lastItemId?: string | null;
           pendingItem?: PendingItem | null;
+          recentlyDeleted?: DeletedItemData[];
         };
 
         // Parallelize user upsert + items fetch (saves one serial round-trip)
@@ -228,7 +266,7 @@ export async function POST(request: Request) {
         const claudeStream = anthropic.messages.stream({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 800,
-          system: buildSystem(jstNowLabel(), itemsCtx, lastCtx, upcomingSchedule, pendingItem),
+          system: buildSystem(jstNowLabel(), itemsCtx, lastCtx, upcomingSchedule, pendingItem, recentlyDeleted),
           messages: msgs,
         });
 
@@ -276,8 +314,9 @@ export async function POST(request: Request) {
         }
 
         let result: {
-          action: "register" | "edit" | "delete" | "query" | "ask_deadline" | "show";
+          action: "register" | "edit" | "delete" | "delete_group" | "restore" | "query" | "ask_deadline" | "show";
           targetId?: string;
+          targetIds?: string[];
           itemData?: {
             type: ItemType;
             title: string;
@@ -382,13 +421,69 @@ export async function POST(request: Request) {
           return;
         }
 
-        // ── delete ──
+        // ── delete (single) ──
         if (result.action === "delete") {
           const targetId = resolveId(result.targetId) ?? lastItemId;
           if (!targetId) { send({ t: "done", action: "query" }); return; }
           try {
-            await prisma.item.delete({ where: { id: targetId } });
-            send({ t: "done", action: "delete", deletedId: targetId });
+            // prisma.item.delete returns the deleted record — use it for UNDO
+            const deletedItem = await prisma.item.delete({ where: { id: targetId } });
+            send({ t: "done", action: "delete", deletedId: targetId, item: deletedItem });
+          } catch {
+            send({ t: "done", action: "query" });
+          }
+          return;
+        }
+
+        // ── delete_group ──
+        if (result.action === "delete_group" && result.targetIds?.length) {
+          const ids = result.targetIds
+            .map((s) => resolveId(s))
+            .filter((id): id is string => id !== null);
+
+          if (ids.length === 0) { send({ t: "done", action: "query" }); return; }
+
+          try {
+            // Fetch full item data first so client can UNDO
+            const toDelete = await prisma.item.findMany({
+              where: { id: { in: ids }, userId: authUser.id },
+            });
+            await prisma.item.deleteMany({
+              where: { id: { in: ids }, userId: authUser.id },
+            });
+            send({ t: "done", action: "delete_group", items: toDelete });
+          } catch {
+            send({ t: "done", action: "query" });
+          }
+          return;
+        }
+
+        // ── restore ──
+        if (result.action === "restore") {
+          const shortId = result.targetId;
+          const deleted = recentlyDeleted?.find(
+            (d) => d.id.slice(-8) === shortId || d.id === shortId
+          );
+
+          if (!deleted) { send({ t: "done", action: "query" }); return; }
+
+          const originalId = deleted.id;
+          try {
+            const item = await prisma.item.create({
+              data: {
+                userId: authUser.id,
+                rawInput: deleted.rawInput ?? message,
+                type: deleted.type,
+                title: deleted.title,
+                content: deleted.content ?? null,
+                startAt: deleted.startAt ? new Date(deleted.startAt) : null,
+                endAt: deleted.endAt ? new Date(deleted.endAt) : null,
+                deadlineAt: deleted.deadlineAt ? new Date(deleted.deadlineAt) : null,
+                completed: deleted.completed,
+                completedAt: deleted.completedAt ? new Date(deleted.completedAt) : null,
+              },
+            });
+            send({ t: "done", action: "restore", item, originalId });
           } catch {
             send({ t: "done", action: "query" });
           }
