@@ -60,10 +60,9 @@ export default function ItemCard({ item, showCheckbox, onToggle }: ItemCardProps
 
 function getDateInfo(item: Item): { text: string; color: string } | null {
   if (item.type === "EVENT" && item.startAt) {
-    const hasTime = item.endAt;
-    const text = hasTime
+    const text = item.endAt
       ? `${fmtDateTime(item.startAt)} 〜 ${fmtTime(item.endAt)}`
-      : fmtDate(item.startAt);
+      : fmtDateTime(item.startAt);
     return { text, color: "text-blue-600 dark:text-blue-400" };
   }
   if (item.type === "DEADLINE_TASK" && item.deadlineAt) {

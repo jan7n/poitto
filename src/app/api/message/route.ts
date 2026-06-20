@@ -126,7 +126,8 @@ ${lastCtx}
 - action="query" → replyのみ
 - 「さっき」「直前」「最後に」→ 直前に操作したアイテムのIDをtargetIdに使う
 - 日時はJST（UTC+9）オフセット付きISO 8601形式
-- 「明日」「来週末」等は現在のJST日時基準で解釈`;
+- 「明日」「来週末」等は現在のJST日時基準で解釈
+- replyに時刻・日付を必ず含める（例：「9時からテニスを登録しました」「明日14時の会議を追加しました」）`;
 }
 
 export async function POST(request: Request) {

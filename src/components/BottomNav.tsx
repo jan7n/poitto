@@ -35,7 +35,7 @@ export default function BottomNav() {
                 }`}
               >
                 <Icon active={active} />
-                <span className="text-[14px] font-medium leading-none">
+                <span className="text-[11px] font-medium leading-none">
                   {label}
                 </span>
               </div>
