@@ -61,14 +61,21 @@ function buildSystem(
   pendingItem?: PendingItem | null
 ) {
   const pendingSection = pendingItem
-    ? `## ⚠️ 期限ヒアリング中（最優先で処理）:
-ユーザーは「${pendingItem.title}」の期限を答えています。
-ユーザーのメッセージから期限日時を解析し、このタスクをDEADLINE_TASKとして登録してください。
+    ? `## ⚠️ 最優先タスク: 期限を登録してください
+ユーザーは「${pendingItem.title}」の期限を回答しています。
+ユーザーのメッセージから期限日時を解析し、必ず以下の形式でJSONを出力してください。
+
+【必須】action と itemData の両方を正確に出力すること:
 - action: "register"
-- itemData.type: "DEADLINE_TASK"
-- itemData.title: "${pendingItem.title}"${pendingItem.content ? `\n- itemData.content: "${pendingItem.content}"` : ""}
-- itemData.deadlineAt: 解析した期限（JSTオフセット付きISO 8601）
-期限が読み取れない場合（「やっぱりいい」等）は action:"query" で返答してください。
+- itemData.type: "DEADLINE_TASK"（他の値は不可）
+- itemData.title: "${pendingItem.title}"
+- itemData.deadlineAt: ユーザーが述べた日時をJST（+09:00）オフセット付きISO 8601で（必須、絶対省略しない）
+  - 「明日」→ 現在のJST日時の翌日23:59:00+09:00
+  - 「今週金曜」→ その週の金曜23:59:00+09:00
+  - 「来週月曜の朝」→ 来週月曜09:00:00+09:00
+  - 時刻が不明な場合は23:59:00にすること
+
+期限が全く読み取れない場合（「やめる」「やっぱりいい」等）のみ action:"query" を使用。
 
 `
     : "";
@@ -332,6 +339,11 @@ export async function POST(request: Request) {
             d.type = "DEADLINE_TASK";
             if (!d.title) d.title = pendingItem.title;
             if (!d.content && pendingItem.content) d.content = pendingItem.content;
+            // If AI forgot deadlineAt but set startAt, promote startAt → deadlineAt
+            if (!d.deadlineAt && d.startAt) {
+              d.deadlineAt = d.startAt;
+              d.startAt = undefined;
+            }
           }
           try {
             const item = await prisma.item.create({

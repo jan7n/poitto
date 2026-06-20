@@ -65,11 +65,15 @@ function getDateInfo(item: Item): { text: string; color: string } | null {
       : fmtDateTime(item.startAt);
     return { text, color: "text-blue-600 dark:text-blue-400" };
   }
-  if (item.type === "DEADLINE_TASK" && item.deadlineAt) {
-    const overdue = new Date(item.deadlineAt) < new Date();
+  if (item.type === "DEADLINE_TASK" || item.type === "TASK") {
+    // Prefer deadlineAt; fall back to startAt if only that is set
+    const date = item.deadlineAt ?? item.startAt;
+    if (!date) return null;
+    const label = item.deadlineAt ? "期限" : "日時";
+    const isOverdue = !item.completed && new Date(date) < new Date();
     return {
-      text: `期限: ${fmtDateTime(item.deadlineAt)}`,
-      color: overdue && !item.completed
+      text: `${label}: ${fmtDateTime(date)}`,
+      color: isOverdue
         ? "text-red-600 dark:text-red-400"
         : "text-orange-600 dark:text-orange-400",
     };

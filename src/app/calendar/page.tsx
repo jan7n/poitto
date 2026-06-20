@@ -19,16 +19,21 @@ export default function CalendarPage() {
   const todayKey = toJSTKey(new Date());
   const [selectedKey, setSelectedKey] = useState<string | null>(todayKey);
 
-  // Track days that have EVENTs (blue) and/or DEADLINE_TASKs (orange)
+  // Track days with EVENTs (blue) and task/deadline days (orange)
   const eventDays = new Set(
     items
       .filter((i) => i.type === "EVENT" && i.startAt)
       .map((i) => toJSTKey(i.startAt!))
   );
+  // Include any TASK or DEADLINE_TASK that has deadlineAt (preferred) or startAt
   const deadlineDays = new Set(
     items
-      .filter((i) => i.type === "DEADLINE_TASK" && i.deadlineAt)
-      .map((i) => toJSTKey(i.deadlineAt!))
+      .filter(
+        (i) =>
+          (i.type === "DEADLINE_TASK" || i.type === "TASK") &&
+          (i.deadlineAt ?? i.startAt)
+      )
+      .map((i) => toJSTKey((i.deadlineAt ?? i.startAt)!))
   );
 
   const firstDow = new Date(year, month - 1, 1).getDay();
@@ -53,11 +58,14 @@ export default function CalendarPage() {
   }
 
   const selectedItems = selectedKey
-    ? items.filter(
-        (i) =>
-          (i.type === "EVENT" && i.startAt && toJSTKey(i.startAt) === selectedKey) ||
-          (i.type === "DEADLINE_TASK" && i.deadlineAt && toJSTKey(i.deadlineAt) === selectedKey)
-      )
+    ? items.filter((i) => {
+        if (i.type === "EVENT" && i.startAt) return toJSTKey(i.startAt) === selectedKey;
+        if (i.type === "DEADLINE_TASK" || i.type === "TASK") {
+          const date = i.deadlineAt ?? i.startAt;
+          return !!date && toJSTKey(date) === selectedKey;
+        }
+        return false;
+      })
     : [];
 
   const selectedLabel = selectedKey

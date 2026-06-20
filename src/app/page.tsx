@@ -306,8 +306,9 @@ function MiniItemCard({ item }: { item: Item }) {
     dateText = item.endAt
       ? `${fmtDateTime(item.startAt)} 〜 ${fmtTime(item.endAt)}`
       : fmtDateTime(item.startAt);
-  } else if (item.type === "DEADLINE_TASK" && item.deadlineAt) {
-    dateText = `期限: ${fmtDateTime(item.deadlineAt)}`;
+  } else if (item.type === "DEADLINE_TASK" || item.type === "TASK") {
+    const date = item.deadlineAt ?? item.startAt;
+    if (date) dateText = `${item.deadlineAt ? "期限" : "日時"}: ${fmtDateTime(date)}`;
   }
 
   return (
