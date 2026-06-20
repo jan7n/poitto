@@ -46,6 +46,8 @@ export default function Home() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // true only when the user sends a message — enables smooth scroll just for that
+  const smoothScrollRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -86,7 +88,9 @@ export default function Home() {
   }, [deletedBuffer]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const smooth = smoothScrollRef.current;
+    smoothScrollRef.current = false;
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" });
   }, [messages]);
 
   function resizeTextarea() {
@@ -106,6 +110,7 @@ export default function Home() {
     const userMsg: ConvMsg = { id: `u-${Date.now()}`, role: "user", content: text };
     const loadingId = `l-${Date.now()}`;
 
+    smoothScrollRef.current = true;
     setMessages((prev) => [
       ...prev,
       userMsg,
