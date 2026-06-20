@@ -154,8 +154,11 @@ export default function Home() {
         <div ref={bottomRef} className="h-44" aria-hidden="true" />
       </div>
 
-      {/* ── Fixed input bar (sits above BottomNav) ── */}
-      <div className="fixed bottom-14 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95">
+      {/* ── Fixed input bar (sits above BottomNav 72px + safe area) ── */}
+      <div
+        className="fixed left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95"
+        style={{ bottom: "calc(72px + env(safe-area-inset-bottom))" }}
+      >
         <div className="mx-auto flex max-w-2xl items-end gap-2 px-4 py-3">
           <textarea
             ref={textareaRef}

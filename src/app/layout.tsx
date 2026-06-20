@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
@@ -20,6 +20,13 @@ export const metadata: Metadata = {
   description: "AIが整理してくれる、気軽なメモ・スケジュール管理",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -37,7 +44,17 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {user && <AppHeader email={user.email ?? ""} />}
-        <div className={`flex-1 pb-16 ${user ? "pt-10" : ""}`}>{children}</div>
+        {/* pb accounts for BottomNav (72px) + iPhone home indicator */}
+        <div
+          className={`flex-1 ${user ? "pt-10" : ""}`}
+          style={
+            user
+              ? { paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }
+              : undefined
+          }
+        >
+          {children}
+        </div>
         {user && <BottomNav />}
       </body>
     </html>
