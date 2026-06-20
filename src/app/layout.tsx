@@ -7,7 +7,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "ポイッと",
-  description: "AIが整理してくれる、気軽なメモ・スケジュール管理",
+  description: "AIが整理してくれる、気軽なスケジュール管理",
+  appleWebApp: {
+    capable: true,
+    title: "ポイッと",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
@@ -15,6 +20,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#F5F4EF",
 };
 
 export default async function RootLayout({
@@ -35,8 +42,11 @@ export default async function RootLayout({
           <ItemsProvider>
             <AppHeader email={user.email ?? ""} />
             <div
-              className="flex-1 pt-10"
-              style={{ paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}
+              className="flex-1"
+              style={{
+                paddingTop: "calc(40px + env(safe-area-inset-top))",
+                paddingBottom: "calc(72px + env(safe-area-inset-bottom))",
+              }}
             >
               {children}
             </div>
