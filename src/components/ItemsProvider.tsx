@@ -21,14 +21,14 @@ interface ItemsContextValue {
 
 const ItemsContext = createContext<ItemsContextValue>({
   items: [],
-  fetching: true,
+  fetching: false,
   refresh: () => {},
   patchItem: () => {},
 });
 
 export function ItemsProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Item[]>([]);
-  const [fetching, setFetching] = useState(true);
+  const [fetching, setFetching] = useState(false);
 
   const fetchItems = useCallback(async () => {
     try {

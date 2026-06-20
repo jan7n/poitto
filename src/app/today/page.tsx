@@ -38,42 +38,36 @@ export default function TodayPage() {
       <h1 className="text-xl font-semibold text-stone-800">今日</h1>
       <p className="mt-1 mb-8 text-sm text-stone-400">{todayLabel}</p>
 
-      {fetching ? (
-        <p className="text-sm text-stone-400">読み込み中...</p>
-      ) : (
-        <>
-          <Section title="今日の予定" count={todayEvents.length}>
-            {todayEvents.length === 0 ? (
-              <Empty text="今日の予定はありません" />
-            ) : (
-              <ul className="space-y-2">
-                {todayEvents.map((item) => <ItemCard key={item.id} item={item} />)}
-              </ul>
-            )}
-          </Section>
+      <Section title="今日の予定" count={todayEvents.length}>
+        {todayEvents.length === 0 ? (
+          <Empty text="今日の予定はありません" />
+        ) : (
+          <ul className="space-y-2">
+            {todayEvents.map((item) => <ItemCard key={item.id} item={item} />)}
+          </ul>
+        )}
+      </Section>
 
-          <Section title="やること" count={pendingTasks.length} className="mt-8">
-            {pendingTasks.length === 0 ? (
-              <Empty text="タスクはありません" />
-            ) : (
-              <ul className="space-y-2">
-                {pendingTasks.map((item) => (
-                  <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />
-                ))}
-              </ul>
-            )}
-          </Section>
+      <Section title="やること" count={pendingTasks.length} className="mt-8">
+        {pendingTasks.length === 0 ? (
+          <Empty text="タスクはありません" />
+        ) : (
+          <ul className="space-y-2">
+            {pendingTasks.map((item) => (
+              <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />
+            ))}
+          </ul>
+        )}
+      </Section>
 
-          {completedTasks.length > 0 && (
-            <Section title="完了済み" count={completedTasks.length} muted className="mt-8">
-              <ul className="space-y-2">
-                {completedTasks.map((item) => (
-                  <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />
-                ))}
-              </ul>
-            </Section>
-          )}
-        </>
+      {completedTasks.length > 0 && (
+        <Section title="完了済み" count={completedTasks.length} muted className="mt-8">
+          <ul className="space-y-2">
+            {completedTasks.map((item) => (
+              <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />
+            ))}
+          </ul>
+        </Section>
       )}
     </div>
   );

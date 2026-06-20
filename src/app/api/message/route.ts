@@ -61,21 +61,13 @@ function buildSystem(
   pendingItem?: PendingItem | null
 ) {
   const pendingSection = pendingItem
-    ? `## ⚠️ 最優先タスク: 期限を登録してください
-ユーザーは「${pendingItem.title}」の期限を回答しています。
-ユーザーのメッセージから期限日時を解析し、必ず以下の形式でJSONを出力してください。
-
-【必須】action と itemData の両方を正確に出力すること:
-- action: "register"
-- itemData.type: "DEADLINE_TASK"（他の値は不可）
+    ? `最優先: 「${pendingItem.title}」の期限ヒアリング中。
+ユーザーの返答から期限日時を解析し、DEADLINE_TASKとして登録すること。
+- itemData.type: "DEADLINE_TASK"
 - itemData.title: "${pendingItem.title}"
-- itemData.deadlineAt: ユーザーが述べた日時をJST（+09:00）オフセット付きISO 8601で（必須、絶対省略しない）
-  - 「明日」→ 現在のJST日時の翌日23:59:00+09:00
-  - 「今週金曜」→ その週の金曜23:59:00+09:00
-  - 「来週月曜の朝」→ 来週月曜09:00:00+09:00
-  - 時刻が不明な場合は23:59:00にすること
-
-期限が全く読み取れない場合（「やめる」「やっぱりいい」等）のみ action:"query" を使用。
+- itemData.deadlineAt: JSTオフセット付きISO 8601（必須・省略不可）
+  時刻不明の場合は 23:59:00 にする
+期限が読み取れない場合のみ action:"query"。
 
 `
     : "";
@@ -83,62 +75,47 @@ function buildSystem(
   return `あなたは「ポイッと」アプリのAIアシスタントです。
 現在の日時（JST）: ${nowLabel}
 
-${pendingSection}ユーザーのメッセージを以下の分類に分けて、指定の形式で返答してください。
+${pendingSection}【文体ルール・最重要】
+・マークダウン記号（**、*、#、---、_、\`）は絶対に使わない
+・箇条書きは「・」を使う
+・日程の空き時間を答える時は以下の形式（改行+字下げ）:
+  6月21日（日）
+  ・20:00 さなみとこはん
+  ・それ以外は空いています
+・1〜3文で簡潔に。長い文を一文に詰め込まない
 
-## 分類の基準:
-- register: 新しい予定・タスク・メモ・アイデアを新規作成
-- ask_deadline: タスク（TASK/DEADLINE_TASK）を登録しようとしているが、ユーザーのメッセージに具体的な期限が含まれていない場合
-  ※「今日中」「急いで」「今週中」等の表現は期限として扱い、直接registerにする
-  ※ EVENT・NOTE・IDEAには使わない
-- edit: 既存アイテムを更新
-- delete: 既存アイテムを削除
-- query: 登録済みデータへの質問
-
-## 登録済みアイテム（IDと内容）:
+## 登録済みアイテム:
 ${itemsCtx}
 
-## 直近14日間のスケジュール（空き時間計算用）:
+## 直近14日間:
 ${upcomingSchedule}
 
-## 直前に操作したアイテム:
+## 直前操作:
 ${lastCtx}
 
-## 空き時間の質問への回答ルール:
-1. 対象期間を特定
-2. 各日のEVENTから空き時間を計算
-3. 「ご飯」「食事」「飲み」→ 18:00以降の枠のみ
+## 分類:
+- register: 新規登録
+- ask_deadline: タスクだが期限なし（「今日中」「急いで」は直接register）
+- edit: 既存更新
+- delete: 削除
+- query: 質問
 
 ## 出力形式（必ずこの順序）:
-自然な日本語返答（時刻・日付を含める）
+日本語返答
 ${SEP}
 JSON（1行）
 
 ## JSONスキーマ:
-register: {"action":"register","itemData":{"type":"EVENT"|"TASK"|"DEADLINE_TASK"|"NOTE"|"IDEA","title":"30文字以内","content":"省略可","startAt":"省略可","endAt":"省略可","deadlineAt":"省略可"}}
-ask_deadline: {"action":"ask_deadline","pendingItem":{"type":"TASK","title":"タスク名","content":"省略可"}}
-edit: {"action":"edit","targetId":"末尾8桁","updateData":{"title":"省略可","type":"省略可","content":"省略可","startAt":"省略可またはnull","endAt":"省略可またはnull","deadlineAt":"省略可またはnull"}}
+register: {"action":"register","itemData":{"type":"EVENT"|"TASK"|"DEADLINE_TASK"|"NOTE"|"IDEA","title":"30文字以内","startAt":"省略可","endAt":"省略可","deadlineAt":"省略可"}}
+ask_deadline: {"action":"ask_deadline","pendingItem":{"type":"TASK","title":"名前"}}
+edit: {"action":"edit","targetId":"末尾8桁","updateData":{}}
 delete: {"action":"delete","targetId":"末尾8桁"}
 query: {"action":"query"}
 
-## 出力例（ask_deadline）:
-課題ですね。いつまでに終わらせる必要がありますか？
-${SEP}
-{"action":"ask_deadline","pendingItem":{"type":"TASK","title":"課題"}}
-
-## 出力例（期限付き登録）:
-課題を明日23時59分までのタスクとして登録しました。
-${SEP}
-{"action":"register","itemData":{"type":"DEADLINE_TASK","title":"課題","deadlineAt":"2026-06-21T23:59:00+09:00"}}
-
-## 出力例（通常登録）:
-テニスを今日9時から登録しました。
-${SEP}
-{"action":"register","itemData":{"type":"EVENT","title":"テニス","startAt":"2026-06-20T09:00:00+09:00"}}
-
 ## 注意:
-- 「さっき」「直前」「最後に」→ 直前に操作したアイテムのIDをtargetIdに使う
-- 日時はJST（UTC+9）オフセット付きISO 8601形式
-- 「明日」「来週末」等は現在のJST日時基準で解釈`;
+- 日時はJST（+09:00）オフセット付きISO 8601
+- 「さっき」「最後に」→ 直前操作のIDをtargetIdに
+- 「明日」等は現在のJST日時基準`;
 }
 
 export async function POST(request: Request) {
@@ -153,15 +130,11 @@ export async function POST(request: Request) {
       };
 
       try {
-        // Safari buffers until 1024 bytes — send a comment to flush immediately
-        controller.enqueue(
-          encoder.encode(`: ${"x".repeat(1016)}\n\n`)
-        );
+        // Safari buffers until 1024 bytes — flush immediately
+        controller.enqueue(encoder.encode(`: ${"x".repeat(1016)}\n\n`));
 
         const supabase = await createSupabaseServerClient();
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!authUser) {
           send({ t: "error", message: "認証エラーです。" });
           return;
@@ -174,27 +147,30 @@ export async function POST(request: Request) {
           pendingItem?: PendingItem | null;
         };
 
-        let user = await prisma.user.findUnique({ where: { id: authUser.id } });
-        if (!user) {
-          user = await prisma.user.create({
-            data: { id: authUser.id, email: authUser.email ?? "" },
-          });
-        }
+        // Parallelize user upsert + items fetch (saves one serial round-trip)
+        const [user, items] = await Promise.all([
+          prisma.user.upsert({
+            where: { id: authUser.id },
+            update: {},
+            create: { id: authUser.id, email: authUser.email ?? "" },
+          }),
+          prisma.item.findMany({
+            where: { userId: authUser.id },
+            orderBy: { createdAt: "desc" },
+            take: 40,
+            select: {
+              id: true,
+              type: true,
+              title: true,
+              startAt: true,
+              endAt: true,
+              deadlineAt: true,
+              completed: true,
+            },
+          }),
+        ]);
 
-        const items = await prisma.item.findMany({
-          where: { userId: user.id },
-          orderBy: { createdAt: "desc" },
-          take: 60,
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            startAt: true,
-            endAt: true,
-            deadlineAt: true,
-            completed: true,
-          },
-        });
+        void user; // used only for upsert side-effect
 
         const idMap = new Map(items.map((i) => [i.id.slice(-8), i.id]));
 
@@ -204,11 +180,11 @@ export async function POST(request: Request) {
             : items
                 .map((i) => {
                   const parts = [`${i.id.slice(-8)} [${i.type}] ${i.title}`];
-                  if (i.startAt) parts.push(`開始: ${fmtDateTime(i.startAt)}`);
-                  if (i.endAt) parts.push(`終了: ${fmtDateTime(i.endAt)}`);
-                  if (i.deadlineAt) parts.push(`期限: ${fmtDateTime(i.deadlineAt)}`);
-                  if (i.completed) parts.push("✓完了");
-                  return parts.join(" | ");
+                  if (i.startAt) parts.push(`開始:${fmtDateTime(i.startAt)}`);
+                  if (i.endAt) parts.push(`終了:${fmtDateTime(i.endAt)}`);
+                  if (i.deadlineAt) parts.push(`期限:${fmtDateTime(i.deadlineAt)}`);
+                  if (i.completed) parts.push("✓");
+                  return parts.join(" ");
                 })
                 .join("\n");
 
@@ -216,10 +192,10 @@ export async function POST(request: Request) {
         if (lastItemId) {
           const last = items.find((i) => i.id === lastItemId);
           if (last) {
-            const parts = [`ID末尾: ${last.id.slice(-8)} [${last.type}] ${last.title}`];
-            if (last.startAt) parts.push(`開始: ${fmtDateTime(last.startAt)}`);
-            if (last.deadlineAt) parts.push(`期限: ${fmtDateTime(last.deadlineAt)}`);
-            lastCtx = parts.join(" | ");
+            const parts = [`${last.id.slice(-8)} [${last.type}] ${last.title}`];
+            if (last.startAt) parts.push(`開始:${fmtDateTime(last.startAt)}`);
+            if (last.deadlineAt) parts.push(`期限:${fmtDateTime(last.deadlineAt)}`);
+            lastCtx = parts.join(" ");
           }
         }
 
@@ -235,7 +211,7 @@ export async function POST(request: Request) {
 
         const claudeStream = anthropic.messages.stream({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 1024,
+          max_tokens: 800,
           system: buildSystem(jstNowLabel(), itemsCtx, lastCtx, upcomingSchedule, pendingItem),
           messages: msgs,
         });
@@ -245,10 +221,7 @@ export async function POST(request: Request) {
         let sepAt = -1;
 
         for await (const event of claudeStream) {
-          if (
-            event.type !== "content_block_delta" ||
-            event.delta.type !== "text_delta"
-          ) continue;
+          if (event.type !== "content_block_delta" || event.delta.type !== "text_delta") continue;
           const text = event.delta.text;
           buffer += text;
 
@@ -270,14 +243,10 @@ export async function POST(request: Request) {
         }
 
         let jsonStr = "";
-
         if (sepAt !== -1) {
           jsonStr = buffer.slice(sepAt + SEP.length).trim();
         } else {
-          const cleaned = buffer
-            .replace(/^```(?:json)?\s*/i, "")
-            .replace(/\s*```\s*$/, "")
-            .trim();
+          const cleaned = buffer.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
           try {
             const parsed = JSON.parse(cleaned) as { reply?: string; action?: string };
             if (parsed.reply && cursor === 0) send({ t: "chunk", v: parsed.reply });
@@ -334,21 +303,16 @@ export async function POST(request: Request) {
         // ── register ──
         if (result.action === "register" && result.itemData) {
           const d = result.itemData;
-          // When resolving a pending deadline inquiry, force DEADLINE_TASK regardless of AI output
           if (pendingItem) {
             d.type = "DEADLINE_TASK";
             if (!d.title) d.title = pendingItem.title;
             if (!d.content && pendingItem.content) d.content = pendingItem.content;
-            // If AI forgot deadlineAt but set startAt, promote startAt → deadlineAt
-            if (!d.deadlineAt && d.startAt) {
-              d.deadlineAt = d.startAt;
-              d.startAt = undefined;
-            }
+            if (!d.deadlineAt && d.startAt) { d.deadlineAt = d.startAt; d.startAt = undefined; }
           }
           try {
             const item = await prisma.item.create({
               data: {
-                userId: user.id,
+                userId: authUser.id,
                 rawInput: message,
                 type: d.type ?? "NOTE",
                 title: d.title ?? message.slice(0, 30),
@@ -368,10 +332,7 @@ export async function POST(request: Request) {
         // ── edit ──
         if (result.action === "edit" && result.updateData) {
           const targetId = resolveId(result.targetId) ?? lastItemId;
-          if (!targetId) {
-            send({ t: "done", action: "query" });
-            return;
-          }
+          if (!targetId) { send({ t: "done", action: "query" }); return; }
           const u = result.updateData;
           const patch: Record<string, unknown> = {};
           if (u.type !== undefined) patch.type = u.type;
@@ -380,7 +341,6 @@ export async function POST(request: Request) {
           if ("startAt" in u) patch.startAt = parseAsJST(u.startAt);
           if ("endAt" in u) patch.endAt = parseAsJST(u.endAt);
           if ("deadlineAt" in u) patch.deadlineAt = parseAsJST(u.deadlineAt);
-
           try {
             const item = await prisma.item.update({ where: { id: targetId }, data: patch });
             send({ t: "done", action: "edit", item });
@@ -393,10 +353,7 @@ export async function POST(request: Request) {
         // ── delete ──
         if (result.action === "delete") {
           const targetId = resolveId(result.targetId) ?? lastItemId;
-          if (!targetId) {
-            send({ t: "done", action: "query" });
-            return;
-          }
+          if (!targetId) { send({ t: "done", action: "query" }); return; }
           try {
             await prisma.item.delete({ where: { id: targetId } });
             send({ t: "done", action: "delete", deletedId: targetId });
@@ -409,9 +366,7 @@ export async function POST(request: Request) {
         send({ t: "done", action: "query" });
       } catch (err) {
         console.error(err);
-        try {
-          send({ t: "error", message: "エラーが発生しました。" });
-        } catch {}
+        try { send({ t: "error", message: "エラーが発生しました。" }); } catch {}
       } finally {
         controller.close();
       }

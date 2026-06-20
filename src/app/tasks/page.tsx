@@ -33,47 +33,41 @@ export default function TasksPage() {
     <div className="mx-auto max-w-2xl px-4 py-8 pb-24">
       <h1 className="mb-8 text-xl font-semibold text-stone-800">タスク</h1>
 
-      {fetching ? (
-        <p className="text-sm text-stone-400">読み込み中...</p>
-      ) : (
-        <>
-          {overdue.length > 0 && (
-            <div className="mb-8">
-              <SectionHeader label="期限切れ" count={overdue.length} color="text-red-500" />
-              <ul className="space-y-2">
-                {overdue.map((item) => <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />)}
-              </ul>
-            </div>
-          )}
+      {overdue.length > 0 && (
+        <div className="mb-8">
+          <SectionHeader label="期限切れ" count={overdue.length} color="text-red-500" />
+          <ul className="space-y-2">
+            {overdue.map((item) => <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />)}
+          </ul>
+        </div>
+      )}
 
-          <div className="mb-8">
-            <SectionHeader label="未完了" count={pending.length} />
-            {pending.length === 0 ? (
-              <p className="text-sm text-stone-400">タスクはありません</p>
-            ) : (
-              <ul className="space-y-2">
-                {pending.map((item) => <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />)}
-              </ul>
-            )}
-          </div>
+      <div className="mb-8">
+        <SectionHeader label="未完了" count={pending.length} />
+        {pending.length === 0 ? (
+          <p className="text-sm text-stone-400">タスクはありません</p>
+        ) : (
+          <ul className="space-y-2">
+            {pending.map((item) => <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />)}
+          </ul>
+        )}
+      </div>
 
-          {completed.length > 0 && (
-            <div>
-              <button
-                onClick={() => setShowCompleted((s) => !s)}
-                className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-stone-400 hover:text-stone-600"
-              >
-                完了済み <span className="text-stone-300">{completed.length}</span>
-                <span className="text-[10px]">{showCompleted ? "▲" : "▼"}</span>
-              </button>
-              {showCompleted && (
-                <ul className="space-y-2">
-                  {completed.map((item) => <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />)}
-                </ul>
-              )}
-            </div>
+      {completed.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowCompleted((s) => !s)}
+            className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-stone-400 hover:text-stone-600"
+          >
+            完了済み <span className="text-stone-300">{completed.length}</span>
+            <span className="text-[10px]">{showCompleted ? "▲" : "▼"}</span>
+          </button>
+          {showCompleted && (
+            <ul className="space-y-2">
+              {completed.map((item) => <ItemCard key={item.id} item={item} showCheckbox onToggle={handleToggle} />)}
+            </ul>
           )}
-        </>
+        </div>
       )}
     </div>
   );

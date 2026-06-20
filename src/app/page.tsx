@@ -258,6 +258,22 @@ export default function Home() {
   );
 }
 
+// Strip markdown symbols so AI responses always render as clean plain text
+function cleanMarkdown(text: string): string {
+  return text
+    .replace(/\*\*\*([\s\S]+?)\*\*\*/g, "$1")
+    .replace(/\*\*([\s\S]+?)\*\*/g, "$1")
+    .replace(/\*([\s\S]+?)\*/g, "$1")
+    .replace(/_{3}([\s\S]+?)_{3}/g, "$1")
+    .replace(/_{2}([\s\S]+?)_{2}/g, "$1")
+    .replace(/_([\s\S]+?)_/g, "$1")
+    .replace(/^#{1,6}\s+(.+)$/gm, "$1")
+    .replace(/^[-*+]\s+/gm, "・")
+    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")
+    .replace(/^---+$/gm, "")
+    .trim();
+}
+
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-end">
@@ -284,7 +300,7 @@ function AssistantBubble({
           <ThinkingDots />
         ) : (
           <>
-            <p className="whitespace-pre-wrap text-sm text-stone-700 leading-relaxed">{content}</p>
+            <p className="whitespace-pre-wrap text-sm text-stone-700 leading-relaxed">{cleanMarkdown(content)}</p>
             {item && <MiniItemCard item={item} />}
           </>
         )}

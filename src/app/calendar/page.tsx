@@ -159,9 +159,7 @@ export default function CalendarPage() {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-stone-500">
             {selectedLabel}
           </h2>
-          {fetching ? (
-            <p className="text-sm text-stone-400">読み込み中...</p>
-          ) : selectedItems.length === 0 ? (
+          {selectedItems.length === 0 ? (
             <p className="text-sm text-stone-400">この日の予定・期限はありません</p>
           ) : (
             <ul className="space-y-2">

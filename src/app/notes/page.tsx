@@ -38,9 +38,7 @@ export default function NotesPage() {
         ))}
       </div>
 
-      {fetching ? (
-        <p className="text-sm text-stone-400">読み込み中...</p>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className="text-sm text-stone-400">まだ登録されていません</p>
       ) : (
         <ul className="space-y-2">
