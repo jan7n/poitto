@@ -23,15 +23,15 @@ export interface ChatMessage {
 export const TYPE_LABEL: Record<ItemType, string> = {
   EVENT: "予定",
   TASK: "タスク",
-  DEADLINE_TASK: "期限タスク",
+  DEADLINE_TASK: "期限",
   NOTE: "メモ",
   IDEA: "アイデア",
 };
 
 export const TYPE_COLOR: Record<ItemType, string> = {
-  EVENT: "bg-blue-100 text-blue-700",
-  TASK: "bg-green-100 text-green-700",
-  DEADLINE_TASK: "bg-orange-100 text-orange-700",
-  NOTE: "bg-zinc-100 text-zinc-600",
-  IDEA: "bg-purple-100 text-purple-700",
+  EVENT:         "bg-sky-50 text-sky-600",
+  TASK:          "bg-emerald-50 text-emerald-700",
+  DEADLINE_TASK: "bg-amber-50 text-amber-700",
+  NOTE:          "bg-stone-100 text-stone-500",
+  IDEA:          "bg-violet-50 text-violet-600",
 };

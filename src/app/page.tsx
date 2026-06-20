@@ -113,7 +113,6 @@ export default function Home() {
         if (done) break;
 
         buf += decoder.decode(value, { stream: true });
-
         const parts = buf.split("\n\n");
         buf = parts.pop() ?? "";
 
@@ -139,10 +138,8 @@ export default function Home() {
               );
             } else if (event.t === "done") {
               if (event.action === "ask_deadline" && event.pendingItem) {
-                // AI asked for a deadline — store pending item
                 setPendingItem(event.pendingItem);
               } else {
-                // Any other action clears the pending state
                 setPendingItem(null);
                 if (event.item) {
                   setMessages((prev) =>
@@ -185,7 +182,7 @@ export default function Home() {
   return (
     <>
       <div className="mx-auto max-w-2xl px-4 pt-6">
-        <div className="space-y-3">
+        <div className="space-y-4">
           {messages.map((msg) =>
             msg.role === "user" ? (
               <UserBubble key={msg.id} content={msg.content} />
@@ -202,19 +199,19 @@ export default function Home() {
         <div ref={bottomRef} className="h-44" aria-hidden="true" />
       </div>
 
+      {/* Input area */}
       <div
-        className="fixed left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95"
-        style={{ bottom: "calc(72px + env(safe-area-inset-bottom))" }}
+        className="fixed left-0 right-0 z-40 bg-[#F5F4EF] border-t border-stone-200"
+        style={{ bottom: "calc(68px + env(safe-area-inset-bottom))" }}
       >
-        {/* Pending deadline hint */}
         {pendingItem && (
-          <div className="mx-auto max-w-2xl px-4 pt-2">
-            <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <div className="mx-auto max-w-2xl px-4 pt-2.5">
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
               <span>⏰</span>
               <span>「{pendingItem.title}」の期限はいつですか？</span>
               <button
                 onClick={() => setPendingItem(null)}
-                className="ml-auto text-amber-400 hover:text-amber-600 dark:hover:text-amber-200"
+                className="ml-auto text-amber-400 hover:text-amber-600"
                 aria-label="キャンセル"
               >
                 ✕
@@ -233,8 +230,8 @@ export default function Home() {
                 ? `「${pendingItem.title}」の期限を入力（例：明日、来週月曜）`
                 : "予定やタスクを入力、または質問…"
             }
-            className="flex-1 resize-none rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition-[height] focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:ring-zinc-800"
-            style={{ minHeight: "44px", maxHeight: "160px" }}
+            className="flex-1 resize-none rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-800 placeholder-stone-400 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
+            style={{ minHeight: "42px", maxHeight: "160px" }}
             onChange={(e) => {
               setInput(e.target.value);
               resizeTextarea();
@@ -251,7 +248,7 @@ export default function Home() {
             onClick={() => void submit()}
             disabled={loading || !input.trim()}
             aria-label="送信"
-            className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white shadow transition-colors hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-800 text-white transition-colors hover:bg-stone-600 disabled:opacity-30"
           >
             <SendIcon />
           </button>
@@ -264,10 +261,8 @@ export default function Home() {
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-zinc-900 px-4 py-2.5 dark:bg-zinc-100">
-        <p className="whitespace-pre-wrap text-sm text-white dark:text-zinc-900">
-          {content}
-        </p>
+      <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-stone-800 px-4 py-2.5">
+        <p className="whitespace-pre-wrap text-sm text-stone-50 leading-relaxed">{content}</p>
       </div>
     </div>
   );
@@ -284,14 +279,12 @@ function AssistantBubble({
 }) {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="max-w-[78%] rounded-2xl rounded-tl-sm border border-stone-200 bg-white px-4 py-2.5">
         {isLoading ? (
           <ThinkingDots />
         ) : (
           <>
-            <p className="whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">
-              {content}
-            </p>
+            <p className="whitespace-pre-wrap text-sm text-stone-700 leading-relaxed">{content}</p>
             {item && <MiniItemCard item={item} />}
           </>
         )}
@@ -312,26 +305,18 @@ function MiniItemCard({ item }: { item: Item }) {
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-zinc-100 bg-zinc-50 p-2.5 dark:border-zinc-700 dark:bg-zinc-800">
+    <div className="mt-2 rounded-lg border border-stone-100 bg-stone-50 p-2.5">
       <div className="flex items-center gap-1.5">
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLOR[item.type]}`}
-        >
+        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${TYPE_COLOR[item.type]}`}>
           {TYPE_LABEL[item.type]}
         </span>
-        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
-          {item.title}
-        </span>
+        <span className="text-xs font-medium text-stone-700">{item.title}</span>
       </div>
       {item.content && (
-        <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-          {item.content}
-        </p>
+        <p className="mt-0.5 line-clamp-1 text-[11px] text-stone-400">{item.content}</p>
       )}
       {dateText && (
-        <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-          {dateText}
-        </p>
+        <p className="mt-0.5 text-[11px] text-stone-500">{dateText}</p>
       )}
     </div>
   );
@@ -339,12 +324,12 @@ function MiniItemCard({ item }: { item: Item }) {
 
 function ThinkingDots() {
   return (
-    <div className="flex gap-1 py-0.5">
-      {[0, 1, 2].map((i) => (
+    <div className="flex gap-1.5 py-1">
+      {[0, 150, 300].map((delay) => (
         <span
-          key={i}
-          className="h-2 w-2 animate-bounce rounded-full bg-zinc-300 dark:bg-zinc-600"
-          style={{ animationDelay: `${i * 150}ms` }}
+          key={delay}
+          className="h-1.5 w-1.5 rounded-full bg-stone-300"
+          style={{ animation: `pulse-dot 1.2s ease-in-out ${delay}ms infinite` }}
         />
       ))}
     </div>
@@ -353,16 +338,8 @@ function ThinkingDots() {
 
 function SendIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="22" y1="2" x2="11" y2="13" />
       <polygon points="22 2 15 22 11 13 2 9 22 2" />
     </svg>

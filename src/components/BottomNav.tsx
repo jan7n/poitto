@@ -15,30 +15,26 @@ export default function BottomNav() {
   const pathname = usePathname();
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="mx-auto flex h-[72px] max-w-2xl">
+      <div className="mx-auto flex h-[68px] max-w-2xl">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
-              className="flex flex-1 flex-col items-center justify-center"
+              className="flex flex-1 flex-col items-center justify-center gap-1"
             >
-              <div
-                className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-colors ${
-                  active
-                    ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                    : "text-zinc-400 dark:text-zinc-600"
+              <Icon active={active} />
+              <span
+                className={`text-[10px] leading-none tracking-wide ${
+                  active ? "text-stone-800 font-medium" : "text-stone-400"
                 }`}
               >
-                <Icon active={active} />
-                <span className="text-[11px] font-medium leading-none">
-                  {label}
-                </span>
-              </div>
+                {label}
+              </span>
             </Link>
           );
         })}
@@ -49,7 +45,9 @@ export default function BottomNav() {
 
 function InboxIcon({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"
+      className={active ? "text-stone-800" : "text-stone-400"}>
       <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
       <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
     </svg>
@@ -58,7 +56,9 @@ function InboxIcon({ active }: { active: boolean }) {
 
 function SunIcon({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"
+      className={active ? "text-stone-800" : "text-stone-400"}>
       <circle cx="12" cy="12" r="5" />
       <line x1="12" y1="1" x2="12" y2="3" />
       <line x1="12" y1="21" x2="12" y2="23" />
@@ -74,7 +74,9 @@ function SunIcon({ active }: { active: boolean }) {
 
 function CalendarIcon({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"
+      className={active ? "text-stone-800" : "text-stone-400"}>
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
@@ -85,7 +87,9 @@ function CalendarIcon({ active }: { active: boolean }) {
 
 function CheckIcon({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"
+      className={active ? "text-stone-800" : "text-stone-400"}>
       <polyline points="9 11 12 14 22 4" />
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
@@ -94,7 +98,9 @@ function CheckIcon({ active }: { active: boolean }) {
 
 function NoteIcon({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"
+      className={active ? "text-stone-800" : "text-stone-400"}>
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" y1="13" x2="8" y2="13" />

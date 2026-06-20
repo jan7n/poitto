@@ -19,38 +19,34 @@ export default function NotesPage() {
   const filtered = items.filter((i) => types.includes(i.type));
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <div className="mx-auto max-w-2xl px-4 py-8 pb-24">
-        <h1 className="mb-4 text-2xl font-bold text-zinc-900 dark:text-zinc-50">メモ</h1>
+    <div className="mx-auto max-w-2xl px-4 py-8 pb-24">
+      <h1 className="mb-6 text-xl font-semibold text-stone-800">メモ</h1>
 
-        <div className="mb-6 flex gap-2">
-          {FILTERS.map(({ label }, i) => (
-            <button
-              key={label}
-              onClick={() => setFilter(i)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                filter === i
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-400"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {fetching ? (
-          <p className="text-sm text-zinc-400">読み込み中...</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-sm text-zinc-400">まだ登録されていません</p>
-        ) : (
-          <ul className="space-y-3">
-            {filtered.map((item) => (
-              <ItemCard key={item.id} item={item} />
-            ))}
-          </ul>
-        )}
+      <div className="mb-6 flex gap-2">
+        {FILTERS.map(({ label }, i) => (
+          <button
+            key={label}
+            onClick={() => setFilter(i)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              filter === i
+                ? "bg-stone-800 text-white"
+                : "text-stone-500 hover:text-stone-700 hover:bg-stone-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+
+      {fetching ? (
+        <p className="text-sm text-stone-400">読み込み中...</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-stone-400">まだ登録されていません</p>
+      ) : (
+        <ul className="space-y-2">
+          {filtered.map((item) => <ItemCard key={item.id} item={item} />)}
+        </ul>
+      )}
     </div>
   );
 }
