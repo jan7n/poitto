@@ -15,7 +15,8 @@ interface ConvMsg {
   role: "user" | "assistant";
   content: string;
   item?: Item;
-  deletedItems?: Item[];
+  items?: Item[];        // register_group: multiple new items
+  deletedItems?: Item[]; // delete_group: recently deleted items
 }
 
 interface PendingItem {
@@ -174,6 +175,17 @@ export default function Home() {
             } else if (event.t === "done") {
               if (event.action === "ask_deadline" && event.pendingItem) {
                 setPendingItem(event.pendingItem);
+              } else if (event.action === "register_group" && event.items) {
+                setPendingItem(null);
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === loadingId ? { ...m, items: event.items } : m
+                  )
+                );
+                if (event.items.length > 0) {
+                  setLastItemId(event.items[event.items.length - 1].id);
+                }
+                refreshItems();
               } else if (event.action === "delete_group" && event.items) {
                 const ts = Date.now();
                 const newEntries = event.items.map((item) => ({ item, deletedAt: ts }));
@@ -260,6 +272,7 @@ export default function Home() {
                 key={msg.id}
                 content={msg.content}
                 item={msg.item}
+                items={msg.items}
                 deletedItems={msg.deletedItems}
                 isLoading={msg.content === "" && loading}
               />
@@ -357,11 +370,13 @@ function UserBubble({ content }: { content: string }) {
 function AssistantBubble({
   content,
   item,
+  items,
   deletedItems,
   isLoading,
 }: {
   content: string;
   item?: Item;
+  items?: Item[];
   deletedItems?: Item[];
   isLoading: boolean;
 }) {
@@ -374,6 +389,11 @@ function AssistantBubble({
           <>
             <p className="whitespace-pre-wrap text-sm text-stone-700 leading-relaxed">{cleanMarkdown(content)}</p>
             {item && <MiniItemCard item={item} />}
+            {items && items.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {items.map((i) => <MiniItemCard key={i.id} item={i} />)}
+              </div>
+            )}
             {deletedItems && deletedItems.length > 0 && (
               <DeletedItemList items={deletedItems} />
             )}

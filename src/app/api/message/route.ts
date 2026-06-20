@@ -119,7 +119,10 @@ ${upcomingSchedule}
 ${lastCtx}
 
 ## 分類:
-- register: 新規登録
+- register: 新規登録（1件のみ）
+- register_group: 複数アイテムを一括登録（1メッセージに2件以上含まれる場合は必ずこちらを使う）
+  例:「明後日17時からさなみさんとごはん、26日上司とご飯」→ 2件をregister_group
+  ※ registerを2回ではなく、register_groupを1回使う
 - ask_deadline: タスクだが期限なし（「今日中」「急いで」は直接register）
 - show: 既存アイテムをカード表示（ユーザーが名前を言及・質問した場合）
   ※ 登録・編集・削除の意図がない時に使う
@@ -150,6 +153,7 @@ JSON（1行）
 
 ## JSONスキーマ:
 register: {"action":"register","itemData":{"type":"EVENT"|"TASK"|"DEADLINE_TASK"|"NOTE"|"IDEA","title":"30文字以内","startAt":"省略可","endAt":"省略可","deadlineAt":"省略可"}}
+register_group: {"action":"register_group","items":[{"type":"...","title":"...","startAt":"..."},{"type":"...","title":"..."}]}
 ask_deadline: {"action":"ask_deadline","pendingItem":{"type":"TASK","title":"名前"}}
 show: {"action":"show","targetId":"末尾8桁"}
 edit: {"action":"edit","targetId":"末尾8桁","updateData":{}}
@@ -157,6 +161,11 @@ delete: {"action":"delete","targetId":"末尾8桁"}
 delete_group: {"action":"delete_group","keyword":"キーワード","targetIds":["末尾8桁1","末尾8桁2"]}
 restore: {"action":"restore","targetId":"末尾8桁（元のID）"}
 query: {"action":"query"}
+
+## 出力例（register_group）:
+以下の2件を追加しました。
+${SEP}
+{"action":"register_group","items":[{"type":"EVENT","title":"さなみさんとごはん","startAt":"2024-06-23T17:00:00+09:00"},{"type":"EVENT","title":"上司とご飯","startAt":"2024-06-26T00:00:00+09:00"}]}
 
 ## 出力例（show）:
 課題を先生に送るですね。
@@ -319,7 +328,7 @@ export async function POST(request: Request) {
         }
 
         let result: {
-          action: "register" | "edit" | "delete" | "delete_group" | "restore" | "query" | "ask_deadline" | "show";
+          action: "register" | "register_group" | "edit" | "delete" | "delete_group" | "restore" | "query" | "ask_deadline" | "show";
           targetId?: string;
           targetIds?: string[];
           keyword?: string;
@@ -331,6 +340,14 @@ export async function POST(request: Request) {
             endAt?: string;
             deadlineAt?: string;
           };
+          items?: Array<{
+            type: ItemType;
+            title: string;
+            content?: string;
+            startAt?: string;
+            endAt?: string;
+            deadlineAt?: string;
+          }>;
           updateData?: {
             type?: ItemType;
             title?: string;
@@ -403,6 +420,32 @@ export async function POST(request: Request) {
               },
             });
             send({ t: "done", action: "register", item });
+          } catch {
+            send({ t: "done", action: "query" });
+          }
+          return;
+        }
+
+        // ── register_group ──
+        if (result.action === "register_group" && result.items?.length) {
+          try {
+            const created = await Promise.all(
+              result.items.map((d) =>
+                prisma.item.create({
+                  data: {
+                    userId: authUser.id,
+                    rawInput: message,
+                    type: d.type ?? "NOTE",
+                    title: d.title ?? message.slice(0, 30),
+                    content: d.content ?? null,
+                    startAt: parseAsJST(d.startAt),
+                    endAt: parseAsJST(d.endAt),
+                    deadlineAt: parseAsJST(d.deadlineAt),
+                  },
+                })
+              )
+            );
+            send({ t: "done", action: "register_group", items: created });
           } catch {
             send({ t: "done", action: "query" });
           }
