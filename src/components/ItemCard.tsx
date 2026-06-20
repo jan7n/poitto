@@ -40,7 +40,7 @@ export default function ItemCard({ item, showCheckbox, onToggle }: ItemCardProps
             {item.title}
           </p>
           {item.content && (
-            <p className="mt-0.5 text-xs text-stone-400 line-clamp-2 leading-relaxed">
+            <p className="mt-0.5 text-xs text-stone-400 leading-relaxed whitespace-pre-wrap">
               {item.content}
             </p>
           )}

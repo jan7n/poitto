@@ -99,7 +99,12 @@ ${lastCtx}
 - show: 既存アイテムをカード表示（ユーザーが名前を言及・質問した場合）
   ※ 登録・編集・削除の意図がない時に使う
   ※ 返答は「〜ですね。」のみ。行動提案・アドバイス禁止
-- edit: 既存更新
+- edit: 既存更新（タイトル・日時・詳細の変更）
+  + ユーザーが既存イベント/タスクに追加情報・メモ・やること等を言及した場合も edit でcontentを更新する
+  例:「さなみさんとご飯の時に〇〇について話し合う必要がある」
+     → "さなみさんとご飯"を特定し updateData.content を設定
+  ※ 既存のcontentがある場合は「既存の内容\n新しい情報」と追記すること
+  ※ 編集後のアイテムがチャットにカード表示される
 - delete: 削除
 - query: 質問・会話
 
@@ -193,6 +198,7 @@ export async function POST(request: Request) {
                   if (i.startAt) parts.push(`開始:${fmtDateTime(i.startAt)}`);
                   if (i.endAt) parts.push(`終了:${fmtDateTime(i.endAt)}`);
                   if (i.deadlineAt) parts.push(`期限:${fmtDateTime(i.deadlineAt)}`);
+                  if (i.content) parts.push(`詳細:${i.content.slice(0, 40)}`);
                   if (i.completed) parts.push("✓");
                   return parts.join(" ");
                 })
